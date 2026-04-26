@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { ChevronLeft, X } from "lucide-react-native";
+import { ChevronLeft, Sparkles } from "lucide-react-native";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
 import { ActionButton } from "@/components/ui";
@@ -46,6 +47,8 @@ export function OnboardingShell({
   topActionLabel,
   totalSteps,
 }: OnboardingShellProps) {
+  const insets = useSafeAreaInsets();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
@@ -75,7 +78,7 @@ export function OnboardingShell({
           </View>
           {onSkip ? (
             <Pressable onPress={onSkip} style={styles.topAction}>
-              <X color={theme.colors.textOnDark} size={16} />
+              <Sparkles color={theme.colors.textOnDark} size={16} />
               <Text style={styles.topActionText}>
                 {topActionLabel ?? "Skip for now"}
               </Text>
@@ -116,7 +119,7 @@ export function OnboardingShell({
           {children}
         </ScrollView>
 
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(18, insets.bottom + 10) }]}>
           <View style={styles.utilityRow}>
             {onBack ? (
               <Pressable onPress={onBack} style={styles.utilityButton}>
@@ -129,7 +132,9 @@ export function OnboardingShell({
 
             {onSkip ? (
               <Pressable onPress={onSkip} style={styles.skipButton}>
-                <Text style={styles.skipButtonText}>Skip for now</Text>
+                <Text style={styles.skipButtonText}>
+                  {topActionLabel ?? "Skip for now"}
+                </Text>
               </Pressable>
             ) : null}
           </View>

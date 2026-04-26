@@ -76,7 +76,7 @@ export function ScreenHeader({
         <Text style={styles.heroTitle}>{title}</Text>
         <Text style={styles.heroSubtitle}>{subtitle}</Text>
       </View>
-      {rightSlot}
+      {rightSlot ? <View style={styles.screenHeaderSlot}>{rightSlot}</View> : null}
     </View>
   );
 }
@@ -96,7 +96,14 @@ export function SectionHeader({
         {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
       </View>
       {actionLabel && onActionPress ? (
-        <Pressable onPress={onActionPress} style={styles.linkPill}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onActionPress}
+          style={({ pressed }) => [
+            styles.linkPill,
+            pressed && styles.linkPillPressed,
+          ]}
+        >
           <Text style={styles.linkPillText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
@@ -114,9 +121,15 @@ export function ActionButton({
 }: ActionButtonProps) {
   return (
     <Pressable
+      accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={[styles.actionButtonShell, disabled && styles.disabledButton, style]}
+      style={({ pressed }) => [
+        styles.actionButtonShell,
+        pressed && !disabled && styles.actionButtonPressed,
+        disabled && styles.disabledButton,
+        style,
+      ]}
     >
       {secondary ? (
         <View style={[styles.actionButton, styles.secondaryActionButton]}>
@@ -182,6 +195,7 @@ export function EmptyStateCard({
       start={{ x: 0, y: 0 }}
       style={styles.emptyCard}
     >
+      <View style={styles.emptyCardAccent} />
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptySubtitle}>{subtitle}</Text>
       {actionLabel && onPress ? (
@@ -196,19 +210,22 @@ export function EmptyStateCard({
 const styles = StyleSheet.create({
   actionButton: {
     alignItems: "center",
-    borderRadius: 18,
+    borderRadius: 20,
     justifyContent: "center",
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingVertical: 13,
   },
   actionButtonShell: {
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
     shadowColor: theme.colors.shadowStrong,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
+  },
+  actionButtonPressed: {
+    transform: [{ scale: 0.985 }],
   },
   actionButtonText: {
     color: theme.colors.textOnDark,
@@ -254,6 +271,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
     padding: 20,
+    position: "relative",
+  },
+  emptyCardAccent: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 999,
+    height: 4,
+    marginBottom: 14,
+    width: 44,
   },
   emptySubtitle: {
     color: theme.colors.muted,
@@ -306,6 +331,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  linkPillPressed: {
+    opacity: 0.82,
+    transform: [{ translateY: 1 }],
+  },
   linkPillText: {
     color: theme.colors.deepBlue,
     fontSize: 13,
@@ -336,6 +365,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  screenHeaderSlot: {
+    alignItems: "flex-end",
+    paddingTop: 4,
   },
   screenHeaderText: {
     flex: 1,

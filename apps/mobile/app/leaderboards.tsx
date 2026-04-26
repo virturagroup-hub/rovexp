@@ -46,7 +46,7 @@ export default function LeaderboardsScreen() {
               <ChevronLeft color={theme.colors.textOnDark} size={18} />
             </Pressable>
           }
-          subtitle="State, friends, and weekly ladders now read from the backend instead of placeholder data."
+          subtitle="State, friends, and weekly ladders read from live data and keep public usernames visible."
           title="Ranks and rivals"
         />
 
@@ -135,7 +135,7 @@ export default function LeaderboardsScreen() {
             title="Leaderboard is still warming up"
             subtitle={
               activeCollection?.empty_message ??
-              "As completions and friendships accumulate, this ladder will start filling in."
+              "As completions and friendships accumulate, this ladder will start filling in with real explorers."
             }
           />
         )}
@@ -290,12 +290,17 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: 999,
     borderWidth: 1,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   tabActive: {
     backgroundColor: theme.colors.deep,
     borderColor: theme.colors.deep,
+    shadowOpacity: 0.14,
   },
   tabRow: {
     flexDirection: "row",

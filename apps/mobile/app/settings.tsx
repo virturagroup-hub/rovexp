@@ -333,9 +333,9 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notifications placeholder</Text>
+          <Text style={styles.cardTitle}>Notification preferences</Text>
           <Text style={styles.cardBody}>
-            Phase 2 still keeps notifications lightweight, but the preference is now part of your saved settings state.
+            Notifications stay lightweight in this build, but the preference still saves to your account.
           </Text>
           <Pressable
             onPress={() => toggleNotifications(!notificationsEnabled)}

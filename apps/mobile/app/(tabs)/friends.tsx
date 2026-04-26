@@ -379,7 +379,7 @@ export default function FriendsScreen() {
           </View>
           {deferredSearchTerm.trim().length < 2 ? (
             <Text style={styles.searchHint}>
-              Type at least two characters to scout the social graph by handle or code.
+              Type two or more characters to search by handle or friend code.
             </Text>
           ) : searchResults.length ? (
             <View style={styles.listStack}>
@@ -661,7 +661,7 @@ export default function FriendsScreen() {
         <View>
           <SectionHeader
             eyebrow="Friends"
-            subtitle="Accepted friendships feed the all-time friend ladder and keep the orbit connected."
+            subtitle="Accepted friendships feed the ladder and keep the orbit connected."
             title="Accepted friends"
           />
           {hubLoading ? null : acceptedFriends.length ? (

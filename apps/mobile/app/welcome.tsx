@@ -34,19 +34,19 @@ const onboardingSteps = [
   {
     progress: "Welcome aboard",
     subtitle:
-      "Nearby quests, sponsor drops, XP ladders, and city discovery all feel better when the app opens like a real adventure.",
-    title: "Turn your city into a live quest board",
+      "Nearby quests, sponsor drops, and city discovery should feel alive the moment the app opens.",
+    title: "Open on a board that already feels worth exploring",
   },
   {
     progress: "How it works",
     subtitle:
-      "RoveXP stays playful without getting fuzzy: spot a quest, arrive on-site, verify the visit, then leave the review after completion.",
-    title: "The loop is quick, fair, and rewarding",
+      "Spot a quest, arrive on-site, verify the visit, then finish with the review and rewards layer.",
+    title: "The loop stays quick, fair, and easy to follow",
   },
   {
     progress: "Explorer access",
     subtitle:
-      "Sign in to sync your progress, or skip for now to enter a local explorer mode and test the app without getting trapped.",
+      "Sign in to sync your progress, or skip into demo mode and test the app without setup friction.",
     title: "Claim your route and start roaming",
   },
 ] as const;
@@ -272,7 +272,7 @@ export default function WelcomeScreen() {
       step={step}
       subtitle={activeStep.subtitle}
       title={activeStep.title}
-      topActionLabel="Enter app"
+      topActionLabel="Skip to demo"
       totalSteps={onboardingSteps.length}
     >
       {step === 0 ? (
@@ -285,8 +285,8 @@ export default function WelcomeScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.panelTitle}>Your feed should feel alive</Text>
                 <Text style={styles.panelBody}>
-                  Open the app and RoveXP immediately shows nearby missions,
-                  sponsored highlights, and a route worth stepping into.
+                  Open the app and RoveXP should already have a nearby board, a
+                  sponsored spotlight, and a route worth stepping into.
                 </Text>
               </View>
             </View>
@@ -294,12 +294,12 @@ export default function WelcomeScreen() {
             <View style={styles.featureGrid}>
               {[
                 {
-                  body: "Dynamic quest cards and map markers tuned to where you are.",
+                  body: "Dynamic quest cards and map markers tuned to your current area.",
                   icon: Compass,
-                  title: "Quest radar",
+                  title: "Nearby discovery",
                 },
                 {
-                  body: "XP, titles, and badges that reward real movement through the city.",
+                  body: "XP, titles, and badges that make progress feel earned.",
                   icon: Star,
                   title: "Progress that sticks",
                 },
@@ -326,7 +326,7 @@ export default function WelcomeScreen() {
 
           <View style={styles.helperPill}>
             <Text style={styles.helperPillText}>
-              You can skip setup anytime and still land in the real app for testing.
+              Skip to demo anytime and still land in a populated, showcase-ready app.
             </Text>
           </View>
         </>
@@ -337,17 +337,17 @@ export default function WelcomeScreen() {
           <View style={styles.panel}>
             {[
               {
-                body: "Pick the mission you want to chase from the nearby board or live map.",
+                body: "Pick the mission you want to chase from the nearby board or map.",
                 icon: Compass,
-                title: "1. Accept the quest",
+                title: "1. Choose the route",
               },
               {
-                body: "Arrive on-site and check in so the app knows you really made the trip.",
+                body: "Arrive on-site and check in so the app knows you made the trip.",
                 icon: Waypoints,
                 title: "2. Verify the stop",
               },
               {
-                body: "Complete the run, bank the XP, then unlock the review and optional photo.",
+                body: "Complete the run, bank the XP, and unlock the review layer.",
                 icon: ShieldCheck,
                 title: "3. Finish strong",
               },
@@ -369,10 +369,10 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.rewardStrip}>
-            <Text style={styles.rewardStripTitle}>What unlocks next</Text>
+            <Text style={styles.rewardStripTitle}>Why the loop feels good</Text>
             <Text style={styles.rewardStripBody}>
-              Live check-ins, leaderboard movement, and sponsor quest visibility all
-              feel more rewarding when the setup flow gets you moving fast.
+              Live check-ins, leaderboard movement, and sponsored visibility all feel
+              more rewarding when the setup flow gets you moving fast.
             </Text>
           </View>
         </>
@@ -395,8 +395,8 @@ export default function WelcomeScreen() {
                 <View style={styles.providerCard}>
                   <Text style={styles.providerEyebrow}>Continue with</Text>
                   <Text style={styles.providerNotice}>
-                    Email sign-in is fully available. Social buttons activate only
-                    when the provider is configured for this build.
+                    Email sign-in is live. Social providers only light up when the
+                    showcase build is configured for them.
                   </Text>
                   <View style={styles.providerStack}>
                     {socialProviders.map((option) => {
@@ -542,8 +542,8 @@ export default function WelcomeScreen() {
 
               <Text style={styles.authHint}>
                 {hasSupabaseConfig
-                  ? `Continue will ${mode === "sign-in" ? "sign you in" : "create your explorer account"}.`
-                  : "Supabase is not configured here, so continue will open the local explorer fallback."}
+                  ? `Continue will ${mode === "sign-in" ? "sign you in" : "create your explorer account"} and keep your profile synced.`
+                  : "Supabase is not configured here, so continue opens the local explorer fallback."}
               </Text>
 
               {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -556,10 +556,10 @@ export default function WelcomeScreen() {
           )}
 
           <View style={styles.devCard}>
-            <Text style={styles.devCardTitle}>Need to test quickly?</Text>
+            <Text style={styles.devCardTitle}>Need a fast start?</Text>
             <Text style={styles.devCardBody}>
-              Skip for now enters a local explorer mode so you can reach the Home
-              tab immediately without getting stuck in setup.
+              Skip to demo enters a local explorer mode so you can reach the Home tab
+              immediately without getting trapped in setup.
             </Text>
           </View>
         </View>

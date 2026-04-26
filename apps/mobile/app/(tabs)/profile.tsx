@@ -3,7 +3,13 @@ import { Medal, ShieldCheck } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { SettingsButton } from "@/components/settings-button";
-import { ActionButton, ScreenHeader, ScreenView, SectionHeader } from "@/components/ui";
+import {
+  ActionButton,
+  EmptyStateCard,
+  ScreenHeader,
+  ScreenView,
+  SectionHeader,
+} from "@/components/ui";
 import { theme } from "@/constants/theme";
 import { tabBarLayout } from "@/constants/navigation";
 import { useProfileSummaryQuery } from "@/hooks/use-rovexp-data";
@@ -31,7 +37,7 @@ export default function ProfileScreen() {
         <ScreenHeader
           eyebrow="Profile"
           rightSlot={<SettingsButton />}
-          subtitle="XP, title loadout, badges, and the persistent profile record now all come from the same account surface."
+          subtitle="XP, titles, badges, and identity settings now all come from the same account surface."
           title="Explorer profile"
         />
 
@@ -40,7 +46,9 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <Text style={styles.name}>@{data?.profile.username}</Text>
-          <Text style={styles.homeState}>Public handle used on leaderboards</Text>
+          <Text style={styles.homeState}>
+            Public handle used on leaderboards. Private display name stays tucked away.
+          </Text>
           {authMode === "demo" ? (
             <View style={styles.demoPill}>
               <Text style={styles.demoPillText}>Demo mode active</Text>
@@ -90,17 +98,24 @@ export default function ProfileScreen() {
             subtitle="Featured badge previews that hint at the fuller collection system coming next."
             title="Badge shelf"
           />
-          <View style={styles.badgeGrid}>
-            {data?.featured_badges.map((badge) => (
-              <View key={badge.id} style={styles.badgeCard}>
-                <View style={styles.badgeIcon}>
-                  <ShieldCheck color={theme.colors.accent} size={16} />
+          {data?.featured_badges.length ? (
+            <View style={styles.badgeGrid}>
+              {data.featured_badges.map((badge) => (
+                <View key={badge.id} style={styles.badgeCard}>
+                  <View style={styles.badgeIcon}>
+                    <ShieldCheck color={theme.colors.accent} size={16} />
+                  </View>
+                  <Text style={styles.badgeName}>{badge.name}</Text>
+                  <Text style={styles.badgeDescription}>{badge.description}</Text>
                 </View>
-                <Text style={styles.badgeName}>{badge.name}</Text>
-                <Text style={styles.badgeDescription}>{badge.description}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <EmptyStateCard
+              title="Badge shelf is still warming up"
+              subtitle="This profile will start collecting featured badge previews as more quests and titles are unlocked."
+            />
+          )}
         </View>
 
         <ActionButton
