@@ -47,12 +47,12 @@ export default async function MapExplorerPage({
               <Badge variant="outline">Stored places</Badge>
             </div>
             <CardTitle className="font-display text-3xl tracking-tight text-slate-950">
-              Search the map, inspect a place, and seed the next quest source
+              Search stored places or drop a new pin to seed the next quest source
             </CardTitle>
             <p className="max-w-3xl text-sm leading-7 text-slate-600">
-              This tool uses the stored places table as its source of truth. Search by business name,
-              address, city, or landmark, then choose whether to open, edit, or generate the next
-              candidate from the selected place.
+              The map explorer has two clear workflows. Search only the stored places already in the
+              RoveXP database, or switch to manual add mode to drop a fresh pin and create a new
+              place record. This is an internal ops tool, not a live external places search.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
@@ -106,9 +106,9 @@ export default async function MapExplorerPage({
 
             <div className="space-y-3">
               {[
-                "Search by business, landmark, address, or city.",
+                "Search only the stored places already imported into RoveXP.",
+                "Switch to manual add mode to drop a pin and create a new place record.",
                 "Inspect imported status, candidate status, and published quests in one view.",
-                "Drop a new pin on the map to seed a place, then optionally generate a candidate right away.",
               ].map((item) => (
                 <div
                   key={item}

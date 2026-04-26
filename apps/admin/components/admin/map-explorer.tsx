@@ -1,24 +1,26 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
 import {
   ArrowRight,
+  Compass,
   Layers3,
   Map as MapIcon,
-  MapPinned,
+  MapPin,
   Pin,
+  Plus,
+  RefreshCcw,
   Search,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
 
 import {
   generateQuestCandidateAction,
   savePlaceAndGenerateCandidateAction,
   savePlaceFromMapAction,
 } from "@/lib/admin/actions";
-import { cn } from "@/lib/utils";
-
 import type {
   PlaceWithRelations,
   QuestCandidateWithRelations,
@@ -30,21 +32,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-
-interface DraftPin {
-  latitude: number;
-  longitude: number;
-}
-
-interface DraftPlaceFormState {
-  address: string;
-  city: string;
-  description: string;
-  name: string;
-  placeType: string;
-  stateId: string;
-}
 
 interface AdminMapExplorerProps {
   candidates: QuestCandidateWithRelations[];
@@ -53,286 +44,197 @@ interface AdminMapExplorerProps {
   states: StateRecord[];
 }
 
-function normalize(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+type WorkflowMode = "search" | "manual";
+
+type SearchDraft = {
+  activeOnly: boolean;
+  placeType: string;
+  publicOnly: boolean;
+  query: string;
+  stateId: string;
+};
+
+type ManualDraft = {
+  address: string;
+  city: string;
+  description: string;
+  image_url: string;
+  is_active: boolean;
+  is_publicly_visitable: boolean;
+  latitude: number;
+  longitude: number;
+  name: string;
+  place_type: string;
+  rating: string;
+  review_count: string;
+  source_metadata: string;
+  state_code: string;
+  state_id: string;
+  website: string;
+};
+
+type PlacePipelineStatus = "imported" | "candidate" | "live";
+
+const MapCanvas = dynamic(() => import("./web-leaflet-map"), {
+  loading: () => (
+    <div className="flex h-full min-h-[560px] items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-950/95 text-sm text-slate-300">
+      Loading map…
+    </div>
+  ),
+  ssr: false,
+});
+
+const DEFAULT_CENTER = { latitude: 39.8283, longitude: -98.5795 };
+
+function normalize(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
 }
 
 function formatStateLabel(state: StateRecord | null | undefined) {
   if (!state) {
-    return "Unknown state";
+    return "Unassigned state";
   }
 
   return `${state.code} · ${state.name}`;
 }
 
-function matchesSearch(place: PlaceWithRelations, search: string) {
-  const haystack = normalize(
+function buildSearchableText(place: PlaceWithRelations) {
+  return normalize(
     [
       place.name,
+      place.description,
+      place.address,
+      place.city,
       place.place_type,
-      place.address ?? "",
-      place.city ?? "",
-      place.state?.code ?? place.state_code ?? "",
-      place.state?.name ?? "",
-      place.description ?? "",
-      place.external_source ?? "",
-      place.external_id ?? "",
+      place.state?.code,
+      place.state?.name,
+      place.website,
     ]
-      .join(" ")
-      .trim(),
+      .filter(Boolean)
+      .join(" "),
   );
-
-  return haystack.includes(normalize(search));
 }
 
-function buildBounds(
-  places: PlaceWithRelations[],
-): { latSpan: number; lngSpan: number; maxLat: number; maxLng: number; minLat: number; minLng: number } {
-  if (!places.length) {
-    return {
-      latSpan: 6,
-      lngSpan: 10,
-      maxLat: 42,
-      maxLng: -92,
-      minLat: 36,
-      minLng: -102,
-    };
+function matchesSearch(place: PlaceWithRelations, filters: SearchDraft) {
+  const query = normalize(filters.query);
+  const placeType = normalize(filters.placeType);
+  const text = buildSearchableText(place);
+
+  if (filters.stateId && place.state?.id !== filters.stateId) {
+    return false;
   }
 
-  const latitudes = places.map((place) => place.latitude);
-  const longitudes = places.map((place) => place.longitude);
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-  const latSpan = Math.max(maxLat - minLat, 0.02);
-  const lngSpan = Math.max(maxLng - minLng, 0.02);
-  const latPad = Math.max(latSpan * 0.18, 0.02);
-  const lngPad = Math.max(lngSpan * 0.18, 0.02);
+  if (filters.activeOnly && !place.is_active) {
+    return false;
+  }
+
+  if (filters.publicOnly && !place.is_publicly_visitable) {
+    return false;
+  }
+
+  if (placeType && normalize(place.place_type) !== placeType) {
+    return false;
+  }
+
+  if (query && !text.includes(query)) {
+    return false;
+  }
+
+  return true;
+}
+
+function deriveCenter(places: PlaceWithRelations[]) {
+  const valid = places.filter(
+    (place) =>
+      Number.isFinite(place.latitude) &&
+      Number.isFinite(place.longitude) &&
+      !(place.latitude === 0 && place.longitude === 0),
+  );
+
+  if (!valid.length) {
+    return DEFAULT_CENTER;
+  }
+
+  const totals = valid.reduce(
+    (accumulator, place) => {
+      accumulator.latitude += place.latitude;
+      accumulator.longitude += place.longitude;
+      return accumulator;
+    },
+    { latitude: 0, longitude: 0 },
+  );
 
   return {
-    latSpan: latSpan + latPad * 2,
-    lngSpan: lngSpan + lngPad * 2,
-    maxLat: maxLat + latPad,
-    maxLng: maxLng + lngPad,
-    minLat: minLat - latPad,
-    minLng: minLng - lngPad,
+    latitude: totals.latitude / valid.length,
+    longitude: totals.longitude / valid.length,
   };
 }
 
-function projectToPercent(
-  latitude: number,
-  longitude: number,
-  bounds: ReturnType<typeof buildBounds>,
-) {
-  const latRatio = (bounds.maxLat - latitude) / bounds.latSpan;
-  const lngRatio = (longitude - bounds.minLng) / bounds.lngSpan;
-
-  return {
-    left: Math.max(3, Math.min(97, lngRatio * 100)),
-    top: Math.max(3, Math.min(97, latRatio * 100)),
-  };
-}
-
-function formatCount(value: number) {
-  return value.toLocaleString();
-}
-
-function getPlaceStatus(place: PlaceWithRelations, candidate?: QuestCandidateWithRelations | null, quest?: QuestWithRelations | null) {
+function getPlaceStatus(
+  place: PlaceWithRelations,
+  candidate: QuestCandidateWithRelations | null,
+  quest: QuestWithRelations | null,
+): PlacePipelineStatus {
   if (quest) {
     return "live";
   }
 
   if (candidate) {
-    return candidate.status;
+    return "candidate";
   }
 
-  return "place";
+  return "imported";
 }
 
-function statusTone(status: string) {
+function statusBadgeTone(status: PlacePipelineStatus) {
   switch (status) {
-    case "published":
     case "live":
-      return "bg-amber-400 text-amber-950";
-    case "approved":
-      return "bg-emerald-400 text-emerald-950";
-    case "rejected":
-      return "bg-rose-300 text-rose-950";
-    case "draft":
-      return "bg-cyan-300 text-cyan-950";
+      return "bg-amber-100 text-amber-950";
+    case "candidate":
+      return "bg-cyan-100 text-cyan-950";
+    case "imported":
     default:
-      return "bg-slate-200 text-slate-800";
+      return "bg-slate-100 text-slate-900";
   }
 }
 
-function statusLabel(
-  place: PlaceWithRelations,
-  candidate?: QuestCandidateWithRelations | null,
-  quest?: QuestWithRelations | null,
-) {
-  if (quest) {
-    return "Live quest";
+function statusLabel(status: PlacePipelineStatus) {
+  switch (status) {
+    case "live":
+      return "Live quest";
+    case "candidate":
+      return "Candidate";
+    case "imported":
+    default:
+      return "Imported";
   }
-
-  if (candidate) {
-    return `Candidate ${candidate.status}`;
-  }
-
-  if (place.is_active) {
-    return "Imported place";
-  }
-
-  return "Inactive place";
 }
 
-function MapCanvas({
-  bounds,
-  draftPin,
-  emptyState,
-  onCreateDraftPin,
-  onSelectPlace,
-  places,
-  selectedPlaceId,
-}: {
-  bounds: ReturnType<typeof buildBounds>;
-  draftPin: DraftPin | null;
-  emptyState: string;
-  onCreateDraftPin: (point: DraftPin) => void;
-  onSelectPlace: (placeId: string) => void;
-  places: PlaceWithRelations[];
-  selectedPlaceId: string | null;
-}) {
-  return (
-    <div
-      className="relative min-h-[540px] overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,_rgba(9,18,34,1)_0%,_rgba(17,44,78,1)_52%,_rgba(12,27,52,1)_100%)] shadow-[0_22px_64px_rgba(15,23,42,0.16)]"
-      onClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / rect.width;
-        const y = (event.clientY - rect.top) / rect.height;
-        const latitude = bounds.maxLat - y * bounds.latSpan;
-        const longitude = bounds.minLng + x * bounds.lngSpan;
+function matchesResultResult(place: PlaceWithRelations, query: string) {
+  return buildSearchableText(place).includes(normalize(query));
+}
 
-        onCreateDraftPin({ latitude, longitude });
-      }}
-      role="presentation"
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(45,183,255,0.3),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(245,184,46,0.16),_transparent_28%),radial-gradient(circle_at_center,_rgba(255,255,255,0.08),_transparent_42%)]" />
-      <div
-        className="absolute inset-0 opacity-25"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
-          backgroundSize: "72px 72px",
-        }}
-      />
+function defaultManualDraft(states: StateRecord[], center: { latitude: number; longitude: number }): ManualDraft {
+  const preferredState = states.find((state) => state.code === "IL") ?? states[0] ?? null;
 
-      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-xs uppercase tracking-[0.24em] text-slate-100 backdrop-blur">
-        <MapIcon className="size-3.5" />
-        Stored places map
-      </div>
-
-      <div className="absolute right-4 top-4 z-10 rounded-full border border-white/10 bg-slate-950/45 px-3 py-2 text-xs uppercase tracking-[0.24em] text-slate-100 backdrop-blur">
-        Click blank space to drop a new place pin
-      </div>
-
-      <div className="relative h-full min-h-[540px]">
-        {places.length === 0 ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
-            <div className="max-w-xl rounded-[2rem] border border-white/10 bg-slate-950/55 px-6 py-5 text-center text-slate-100 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-300">No map results</p>
-              <p className="mt-2 font-display text-2xl tracking-tight text-white">{emptyState}</p>
-              <p className="mt-2 text-sm leading-7 text-slate-300">
-                Try widening the search or clearing a filter to bring stored places back onto the map.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {places.map((place) => {
-          const position = projectToPercent(place.latitude, place.longitude, bounds);
-          const selected = place.id === selectedPlaceId;
-
-          return (
-            <button
-              key={place.id}
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelectPlace(place.id);
-              }}
-              className={cn(
-                "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-full border px-3 py-2 text-left shadow-[0_8px_24px_rgba(15,23,42,0.28)] transition",
-                selected
-                  ? "scale-110 border-white/70 bg-white text-slate-950"
-                  : place.is_publicly_visitable
-                    ? "border-white/20 bg-slate-950/60 text-white hover:border-white/60 hover:bg-slate-900/85"
-                    : "border-white/20 bg-slate-800/70 text-slate-200 hover:bg-slate-800",
-              )}
-              style={{
-                left: `${position.left}%`,
-                top: `${position.top}%`,
-              }}
-            >
-              <span
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.2em]",
-                  selected
-                    ? "bg-sky-500 text-white"
-                    : place.is_publicly_visitable
-                      ? "bg-white/10 text-sky-100"
-                      : "bg-white/5 text-slate-200",
-                )}
-              >
-                {place.place_type.slice(0, 2).toUpperCase()}
-              </span>
-              <span className="max-w-[140px] text-[11px] font-semibold leading-4">
-                {place.name}
-              </span>
-            </button>
-          );
-        })}
-
-        {draftPin ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-            className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${projectToPercent(draftPin.latitude, draftPin.longitude, bounds).left}%`,
-              top: `${projectToPercent(draftPin.latitude, draftPin.longitude, bounds).top}%`,
-            }}
-          >
-            <span className="flex size-11 items-center justify-center rounded-full border border-white/80 bg-cyan-400 text-cyan-950 shadow-[0_12px_30px_rgba(45,183,255,0.38)]">
-              <Pin className="size-5" />
-            </span>
-          </button>
-        ) : null}
-      </div>
-
-      <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-slate-950/45 px-4 py-3 text-xs text-slate-100 backdrop-blur">
-        <p className="max-w-2xl leading-6 text-slate-200">
-          The map uses the stored places table only. Search by business, landmark, address, or city,
-          then seed new places directly from the canvas when you want to expand a neighborhood.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/10 px-3 py-1 uppercase tracking-[0.18em]">
-            {formatCount(places.length)} markers
-          </span>
-          {draftPin ? (
-            <span className="rounded-full bg-cyan-500/15 px-3 py-1 uppercase tracking-[0.18em] text-cyan-100">
-              Draft pin active
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
+  return {
+    address: "",
+    city: "",
+    description: "",
+    image_url: "",
+    is_active: true,
+    is_publicly_visitable: true,
+    latitude: center.latitude,
+    longitude: center.longitude,
+    name: "",
+    place_type: "landmark",
+    rating: "",
+    review_count: "",
+    source_metadata: "",
+    state_code: preferredState?.code ?? "",
+    state_id: preferredState?.id ?? "",
+    website: "",
+  };
 }
 
 export function AdminMapExplorer({
@@ -341,347 +243,272 @@ export function AdminMapExplorer({
   quests,
   states,
 }: AdminMapExplorerProps) {
-  const [draftQuery, setDraftQuery] = useState("");
-  const [appliedQuery, setAppliedQuery] = useState("");
-  const [draftStateFilter, setDraftStateFilter] = useState("all");
-  const [appliedStateFilter, setAppliedStateFilter] = useState("all");
-  const [draftPlaceTypeFilter, setDraftPlaceTypeFilter] = useState("all");
-  const [appliedPlaceTypeFilter, setAppliedPlaceTypeFilter] = useState("all");
-  const [draftActiveOnly, setDraftActiveOnly] = useState(true);
-  const [appliedActiveOnly, setAppliedActiveOnly] = useState(true);
-  const [draftPublicOnly, setDraftPublicOnly] = useState(true);
-  const [appliedPublicOnly, setAppliedPublicOnly] = useState(true);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(
-    places[0]?.id ?? null,
+  const [workflow, setWorkflow] = useState<WorkflowMode>("search");
+  const [searchDraft, setSearchDraft] = useState<SearchDraft>(() => ({
+    activeOnly: true,
+    placeType: "",
+    publicOnly: true,
+    query: "",
+    stateId: "",
+  }));
+  const [appliedSearch, setAppliedSearch] = useState<SearchDraft>(searchDraft);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(places[0]?.id ?? null);
+  const [draftPin, setDraftPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [manualDraft, setManualDraft] = useState<ManualDraft>(() =>
+    defaultManualDraft(states, deriveCenter(places)),
   );
-  const [draftPin, setDraftPin] = useState<DraftPin | null>(null);
-  const [draftForm, setDraftForm] = useState<DraftPlaceFormState>({
-    address: "",
-    city: "",
-    description: "",
-    name: "",
-    placeType: "landmark",
-    stateId: states[0]?.id ?? "",
-  });
+  const [isSearching, startSearchTransition] = useTransition();
 
+  const allPlaceTypes = useMemo(
+    () => Array.from(new Set(places.map((place) => place.place_type).filter(Boolean))).sort(),
+    [places],
+  );
+  const stateById = useMemo(() => new Map(states.map((state) => [state.id, state])), [states]);
   const candidateByPlaceId = useMemo(
     () => new Map(candidates.map((candidate) => [candidate.place_id, candidate])),
     [candidates],
   );
-  const questByPlaceId = useMemo(
-    () =>
-      new Map(
-        quests
-          .filter((quest) => Boolean(quest.place_id))
-          .map((quest) => [quest.place_id as string, quest]),
-      ),
-    [quests],
-  );
-  const stateById = useMemo(
-    () => new Map(states.map((state) => [state.id, state])),
-    [states],
-  );
-  const placeTypes = useMemo(() => {
-    const unique = new Set<string>();
+  const questByPlaceId = useMemo(() => {
+    const entries = quests
+      .filter((quest) => quest.place_id)
+      .map((quest) => [quest.place_id as string, quest] as const);
 
-    for (const place of places) {
-      unique.add(place.place_type);
-    }
-
-    return Array.from(unique).sort((left, right) => left.localeCompare(right));
-  }, [places]);
+    return new Map(entries);
+  }, [quests]);
 
   const filteredPlaces = useMemo(() => {
-    const normalizedQuery = normalize(appliedQuery);
+    const query = normalize(appliedSearch.query);
 
-    return places.filter((place) => {
-      const placeStateId = place.state?.id ?? place.state_id ?? "";
-      const placeStateCode = place.state?.code ?? place.state_code ?? "";
+    return places
+      .filter((place) => matchesSearch(place, appliedSearch))
+      .filter((place) => (query ? matchesResultResult(place, query) : true))
+      .sort((a, b) => {
+        const aStatus = getPlaceStatus(a, candidateByPlaceId.get(a.id) ?? null, questByPlaceId.get(a.id) ?? null);
+        const bStatus = getPlaceStatus(b, candidateByPlaceId.get(b.id) ?? null, questByPlaceId.get(b.id) ?? null);
 
-      if (
-        appliedStateFilter !== "all" &&
-        placeStateId !== appliedStateFilter &&
-        placeStateCode !== appliedStateFilter
-      ) {
-        return false;
-      }
+        if (aStatus !== bStatus) {
+          const weight = { live: 0, candidate: 1, imported: 2 } as const;
+          return weight[aStatus] - weight[bStatus];
+        }
 
-      if (
-        appliedPlaceTypeFilter !== "all" &&
-        normalize(place.place_type) !== normalize(appliedPlaceTypeFilter)
-      ) {
-        return false;
-      }
+        return a.name.localeCompare(b.name);
+      });
+  }, [appliedSearch, candidateByPlaceId, places, questByPlaceId]);
 
-      if (appliedActiveOnly && !place.is_active) {
-        return false;
-      }
+  const searchCounts = useMemo(() => {
+    const imported = filteredPlaces.filter((place) => !candidateByPlaceId.has(place.id)).length;
+    const candidate = filteredPlaces.filter((place) => candidateByPlaceId.has(place.id)).length;
+    const live = filteredPlaces.filter((place) => questByPlaceId.has(place.id)).length;
 
-      if (appliedPublicOnly && !place.is_publicly_visitable) {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      return matchesSearch(place, appliedQuery);
-    });
-  }, [
-    appliedActiveOnly,
-    appliedPlaceTypeFilter,
-    appliedPublicOnly,
-    appliedQuery,
-    places,
-    appliedStateFilter,
-  ]);
-
-  const visiblePlaces = filteredPlaces;
-  const bounds = useMemo(() => buildBounds(visiblePlaces), [visiblePlaces]);
-
-  const selectedPlace =
-    filteredPlaces.find((place) => place.id === selectedPlaceId) ?? filteredPlaces[0] ?? null;
-  const selectedCandidate = selectedPlace
-    ? candidateByPlaceId.get(selectedPlace.id) ?? null
-    : null;
-  const selectedQuest = selectedPlace
-    ? questByPlaceId.get(selectedPlace.id) ?? null
-    : null;
-  const selectedState = selectedPlace
-    ? stateById.get(selectedPlace.state_id ?? selectedPlace.state?.id ?? "") ?? selectedPlace.state ?? null
-    : null;
-
-  const filteredCoverage = useMemo(() => {
-    return {
-      candidateCount: filteredPlaces.filter((place) => candidateByPlaceId.has(place.id)).length,
-      questCount: filteredPlaces.filter((place) => questByPlaceId.has(place.id)).length,
-      totalCount: filteredPlaces.length,
-    };
+    return { candidate, imported, live, matched: filteredPlaces.length };
   }, [candidateByPlaceId, filteredPlaces, questByPlaceId]);
 
-  const selectedPlaceVisible =
-    selectedPlace !== null && filteredPlaces.some((place) => place.id === selectedPlace.id);
-  const searchHasBeenApplied =
-    Boolean(appliedQuery) ||
-    appliedStateFilter !== "all" ||
-    appliedPlaceTypeFilter !== "all" ||
-    !appliedActiveOnly ||
-    !appliedPublicOnly;
+  const resolvedSelectedPlaceId = useMemo(() => {
+    if (selectedPlaceId && filteredPlaces.some((place) => place.id === selectedPlaceId)) {
+      return selectedPlaceId;
+    }
 
-  const runSearch = () => {
-    setAppliedQuery(draftQuery.trim());
-    setAppliedStateFilter(draftStateFilter);
-    setAppliedPlaceTypeFilter(draftPlaceTypeFilter);
-    setAppliedActiveOnly(draftActiveOnly);
-    setAppliedPublicOnly(draftPublicOnly);
-  };
+    return filteredPlaces[0]?.id ?? null;
+  }, [filteredPlaces, selectedPlaceId]);
 
-  const resetSearch = () => {
-    setDraftQuery("");
-    setDraftStateFilter("all");
-    setDraftPlaceTypeFilter("all");
-    setDraftActiveOnly(true);
-    setDraftPublicOnly(true);
-    setAppliedQuery("");
-    setAppliedStateFilter("all");
-    setAppliedPlaceTypeFilter("all");
-    setAppliedActiveOnly(true);
-    setAppliedPublicOnly(true);
-  };
+  const selectedPlace = useMemo(
+    () => filteredPlaces.find((place) => place.id === resolvedSelectedPlaceId) ?? null,
+    [filteredPlaces, resolvedSelectedPlaceId],
+  );
+
+  const selectedCandidate = selectedPlace ? candidateByPlaceId.get(selectedPlace.id) ?? null : null;
+  const selectedQuest = selectedPlace ? questByPlaceId.get(selectedPlace.id) ?? null : null;
+  const selectedStatus = selectedPlace
+    ? getPlaceStatus(selectedPlace, selectedCandidate, selectedQuest)
+    : null;
+
+  const manualCenter = useMemo(() => deriveCenter(places), [places]);
+  const searchCenter = useMemo(
+    () => (filteredPlaces.length ? deriveCenter(filteredPlaces) : manualCenter),
+    [filteredPlaces, manualCenter],
+  );
+
+  function runSearch() {
+    startSearchTransition(() => {
+      setAppliedSearch(searchDraft);
+      const visible = places.filter((place) => matchesSearch(place, searchDraft));
+      setSelectedPlaceId(visible[0]?.id ?? null);
+    });
+  }
+
+  function resetSearch() {
+    const next = {
+      activeOnly: true,
+      placeType: "",
+      publicOnly: true,
+      query: "",
+      stateId: "",
+    };
+
+    setSearchDraft(next);
+    setAppliedSearch(next);
+    setSelectedPlaceId(places[0]?.id ?? null);
+  }
+
+  function handleMapPinDrop(coordinates: { latitude: number; longitude: number }) {
+    setDraftPin(coordinates);
+    setManualDraft((current) => ({
+      ...current,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+    }));
+  }
+
+  function updateManualDraft<K extends keyof ManualDraft>(key: K, value: ManualDraft[K]) {
+    setManualDraft((current) => ({ ...current, [key]: value }));
+  }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-      <section className="space-y-5">
-        <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-          <CardContent className="space-y-4 p-5">
-            <form
-              className="space-y-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                runSearch();
-              }}
-            >
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <Search className="size-4 text-slate-400" />
-                <Input
-                  value={draftQuery}
-                  onChange={(event) => setDraftQuery(event.target.value)}
-                  placeholder="Search business, landmark, address, city, or place name"
-                  className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                />
-              </div>
-
-              <select
-                value={draftStateFilter}
-                onChange={(event) => setDraftStateFilter(event.target.value)}
-                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 shadow-sm"
-              >
-                <option value="all">All states</option>
-                {states.map((state) => (
-                  <option key={state.id} value={state.id}>
-                    {state.code} · {state.name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={draftPlaceTypeFilter}
-                onChange={(event) => setDraftPlaceTypeFilter(event.target.value)}
-                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 shadow-sm"
-              >
-                <option value="all">All place types</option>
-                {placeTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <input
-                  checked={draftActiveOnly}
-                  onChange={(event) => setDraftActiveOnly(event.target.checked)}
-                  type="checkbox"
-                />
-                Active only
-              </label>
-              <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <input
-                  checked={draftPublicOnly}
-                  onChange={(event) => setDraftPublicOnly(event.target.checked)}
-                  type="checkbox"
-                />
-                Public only
-              </label>
-              <Button
-                type="submit"
-                className="bg-slate-950 text-white hover:bg-slate-800"
-              >
-                Search places
-              </Button>
-              <Button type="button" variant="outline" onClick={resetSearch}>
-                Reset filters
-              </Button>
-            </div>
-            <p className="text-xs leading-6 text-slate-500">
-              Search applies the current draft filters to the map and result list. If no places match,
-              the map shows an explicit empty state instead of silently falling back to everything.
-            </p>
-            </form>
-          </CardContent>
-        </Card>
-
-        <MapCanvas
-          bounds={bounds}
-          draftPin={draftPin}
-          onCreateDraftPin={setDraftPin}
-          onSelectPlace={setSelectedPlaceId}
-          emptyState={
-            searchHasBeenApplied
-              ? "No places matched this search"
-              : "Run a search to load the map"
-          }
-          places={filteredPlaces}
-          selectedPlaceId={selectedPlaceId}
-        />
-
-        <div className="grid gap-4 md:grid-cols-4">
-          {[
-            { label: "Visible", value: filteredCoverage.totalCount },
-            { label: "Imported", value: filteredPlaces.length },
-            { label: "Candidates", value: filteredCoverage.candidateCount },
-            { label: "Live quests", value: filteredCoverage.questCount },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-[1.75rem] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
-            >
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{item.label}</p>
-              <p className="mt-2 font-display text-3xl font-semibold text-slate-950">
-                {formatCount(item.value)}
-              </p>
-            </div>
-          ))}
+    <Tabs
+      className="space-y-6"
+      onValueChange={(value) => setWorkflow(value as WorkflowMode)}
+      value={workflow}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Map explorer</p>
+          <h2 className="font-display text-2xl tracking-tight text-slate-950">
+            A real admin map for stored places and manual pin-drop curation
+          </h2>
+          <p className="max-w-3xl text-sm leading-7 text-slate-600">
+            Search only the stored places already inside RoveXP, or switch to manual add mode to
+            drop a new pin and seed the next place record. Live external discovery is not part of
+            this screen.
+          </p>
         </div>
-        <p className="text-xs leading-6 text-slate-500">
-          {searchHasBeenApplied
-            ? `${formatCount(filteredPlaces.length)} places are matching the current search.`
-            : "The map is waiting for a search. Press Search places to apply the draft filters."}
-        </p>
-      </section>
+        <TabsList className="grid h-auto grid-cols-2 rounded-full bg-slate-100 p-1">
+          <TabsTrigger value="search" className="rounded-full px-4 py-2">
+            Search stored places
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="rounded-full px-4 py-2">
+            Add new place
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
-      <aside className="space-y-5">
-        {draftPin ? (
-          <Card className="rounded-[2rem] border-sky-200 bg-sky-50/90 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <CardHeader className="space-y-2">
+      <TabsContent className="m-0 space-y-6" value="search">
+        <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+          <Card className="overflow-hidden rounded-[2rem] border-white/70 bg-slate-950 text-white shadow-[0_22px_56px_rgba(15,23,42,0.18)]">
+            <CardHeader className="space-y-3 border-b border-white/10 p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-sky-100 text-sky-900">New place pin</Badge>
-                <Badge variant="outline">Add as Place</Badge>
-                <Badge variant="outline">Add + Generate Candidate</Badge>
+                <Badge className="bg-white/10 text-white">Interactive map</Badge>
+                <Badge className="bg-cyan-100 text-cyan-950">Stored places only</Badge>
+                <Badge variant="outline" className="border-white/10 bg-white/5 text-white">
+                  Click markers to inspect
+                </Badge>
               </div>
-              <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-                Seed a new place from the map
+              <CardTitle className="font-display text-2xl tracking-tight">
+                Search the internal places corpus and inspect markers on a real map
               </CardTitle>
-              <p className="text-sm leading-7 text-slate-600">
-                Use this pin as the starting point for a new place record, then optionally generate a candidate immediately.
+              <p className="max-w-3xl text-sm leading-7 text-slate-300">
+                Use the form below to search places already imported into RoveXP. Press Search to
+                update the map and results list. If nothing matches, the map stays visible and the
+                empty state stays honest.
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <form action={savePlaceFromMapAction} className="space-y-4">
-                <input name="id" type="hidden" value="" />
-                <input name="latitude" type="hidden" value={String(draftPin.latitude)} />
-                <input name="longitude" type="hidden" value={String(draftPin.longitude)} />
-                <input
-                  name="source_metadata"
-                  type="hidden"
-                  value={JSON.stringify({
-                    source: "admin_map_explorer",
-                    mode: "create_place",
-                  })}
+
+            <CardContent className="space-y-4 p-0">
+              <div className="relative min-h-[660px] overflow-hidden">
+                <MapCanvas
+                  draftPin={null}
+                  fallbackCenter={searchCenter}
+                  mode="search"
+                  onDropPin={handleMapPinDrop}
+                  onSelectPlace={setSelectedPlaceId}
+                  places={filteredPlaces}
+                  selectedPlaceId={resolvedSelectedPlaceId}
                 />
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
-                    <label className="text-sm font-semibold text-slate-700">Place name</label>
-                    <Input
-                      name="name"
-                      value={draftForm.name}
-                      onChange={(event) =>
-                        setDraftForm((previous) => ({ ...previous, name: event.target.value }))
-                      }
-                      placeholder="Riverfront overlook, neighborhood cafe..."
-                      required
-                    />
+                <div className="pointer-events-none absolute left-4 top-4 z-[500] flex flex-wrap gap-2">
+                  <Badge className="bg-slate-950/90 text-white backdrop-blur">
+                    <MapIcon className="mr-1.5 size-3.5" />
+                    Stored places map
+                  </Badge>
+                  <Badge className="bg-white/90 text-slate-950 backdrop-blur">
+                    {searchCounts.matched} markers
+                  </Badge>
+                </div>
+
+                <div className="absolute right-4 top-4 z-[500] rounded-full border border-white/15 bg-slate-950/85 px-4 py-2 text-xs uppercase tracking-[0.24em] text-slate-200 shadow-xl backdrop-blur">
+                  Search stored places only
+                </div>
+
+                {filteredPlaces.length === 0 ? (
+                  <div className="pointer-events-auto absolute inset-x-4 bottom-4 z-[500] max-w-[460px] rounded-[1.75rem] border border-white/10 bg-slate-950/90 p-4 text-sm leading-7 text-slate-200 shadow-2xl backdrop-blur">
+                    <p className="font-semibold text-white">No stored places matched this search.</p>
+                    <p className="mt-1 text-slate-300">
+                      Clear the filters, widen the search, or switch to manual add mode and drop a
+                      fresh pin.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        className="bg-white text-slate-950 hover:bg-slate-100"
+                        onClick={resetSearch}
+                        type="button"
+                      >
+                        <RefreshCcw className="size-4" />
+                        Reset filters
+                      </Button>
+                      <Button
+                        className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                        onClick={() => setWorkflow("manual")}
+                        type="button"
+                        variant="outline"
+                      >
+                        <Pin className="size-4" />
+                        Switch to manual add
+                      </Button>
+                    </div>
                   </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-6">
+            <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+              <CardHeader className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Search stored places
+                </p>
+                <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
+                  Query the RoveXP places table
+                </CardTitle>
+                <p className="text-sm leading-7 text-slate-600">
+                  This does not reach out to live external providers. It searches the places that
+                  are already imported into the database and shows them on the map.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="map-search">Search term</Label>
+                  <Input
+                    id="map-search"
+                    onChange={(event) =>
+                      setSearchDraft((current) => ({ ...current, query: event.target.value }))
+                    }
+                    placeholder="Business, landmark, address, city, or place type"
+                    value={searchDraft.query}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Place type</label>
-                    <Input
-                      name="place_type"
-                      value={draftForm.placeType}
-                      onChange={(event) =>
-                        setDraftForm((previous) => ({
-                          ...previous,
-                          placeType: event.target.value,
-                        }))
-                      }
-                      placeholder="park, cafe, mural..."
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">State</label>
+                    <Label htmlFor="map-state">State</Label>
                     <select
-                      name="state_id"
-                      value={draftForm.stateId}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm shadow-sm outline-none transition focus:border-slate-400"
+                      id="map-state"
                       onChange={(event) =>
-                        setDraftForm((previous) => ({ ...previous, stateId: event.target.value }))
+                        setSearchDraft((current) => ({ ...current, stateId: event.target.value }))
                       }
-                      className="h-10 w-full rounded-xl border border-input bg-white px-3 text-sm shadow-xs"
+                      value={searchDraft.stateId}
                     >
-                      <option value="">Select state</option>
+                      <option value="">All states</option>
                       {states.map((state) => (
                         <option key={state.id} value={state.id}>
                           {state.code} · {state.name}
@@ -689,275 +516,626 @@ export function AdminMapExplorer({
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">City</label>
-                    <Input
-                      name="city"
-                      value={draftForm.city}
-                      onChange={(event) =>
-                        setDraftForm((previous) => ({ ...previous, city: event.target.value }))
-                      }
-                      placeholder="Optional city"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">Address</label>
-                    <Input
-                      name="address"
-                      value={draftForm.address}
-                      onChange={(event) =>
-                        setDraftForm((previous) => ({ ...previous, address: event.target.value }))
-                      }
-                      placeholder="Optional address"
-                    />
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Description</label>
-                  <Textarea
-                    name="description"
-                    value={draftForm.description}
-                    onChange={(event) =>
-                      setDraftForm((previous) => ({
-                        ...previous,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Why does this spot deserve to become a quest candidate?"
-                    rows={4}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="map-place-type">Place type</Label>
+                    <select
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm shadow-sm outline-none transition focus:border-slate-400"
+                      id="map-place-type"
+                      onChange={(event) =>
+                        setSearchDraft((current) => ({ ...current, placeType: event.target.value }))
+                      }
+                      value={searchDraft.placeType}
+                    >
+                      <option value="">All place types</option>
+                      {allPlaceTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <Button type="submit" className="bg-slate-950 text-white hover:bg-slate-800">
-                    <MapPinned className="size-4" />
-                    Add as Place
-                  </Button>
+                  <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
+                    <input
+                      checked={searchDraft.activeOnly}
+                      onChange={(event) =>
+                        setSearchDraft((current) => ({
+                          ...current,
+                          activeOnly: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    Active only
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
+                    <input
+                      checked={searchDraft.publicOnly}
+                      onChange={(event) =>
+                        setSearchDraft((current) => ({
+                          ...current,
+                          publicOnly: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    Public only
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
                   <Button
-                    type="submit"
-                    formAction={savePlaceAndGenerateCandidateAction}
-                    variant="outline"
-                    className="border-sky-200 bg-white text-sky-950 hover:bg-sky-50"
-                  >
-                    <Sparkles className="size-4" />
-                    Add + Generate Candidate
-                  </Button>
-                  <Button
+                    className="bg-slate-950 text-white hover:bg-slate-800"
+                    disabled={isSearching}
+                    onClick={runSearch}
                     type="button"
-                    variant="ghost"
-                    onClick={() => setDraftPin(null)}
                   >
-                    Clear pin
+                    {isSearching ? (
+                      <Compass className="size-4 animate-spin" />
+                    ) : (
+                      <Search className="size-4" />
+                    )}
+                    {isSearching ? "Searching…" : "Search stored places"}
+                  </Button>
+                  <Button
+                    className="border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                    onClick={resetSearch}
+                    type="button"
+                    variant="outline"
+                  >
+                    <RefreshCcw className="size-4" />
+                    Reset filters
                   </Button>
                 </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Inspected</p>
+                    <p className="mt-2 font-display text-2xl text-slate-950">{places.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Matched</p>
+                    <p className="mt-2 font-display text-2xl text-slate-950">{searchCounts.matched}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Pipeline</p>
+                    <p className="mt-2 font-display text-2xl text-slate-950">
+                      {searchCounts.candidate + searchCounts.live}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+              <CardHeader className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Selected place
+                </p>
+                <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
+                  {selectedPlace ? selectedPlace.name : "Pick a marker to inspect"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedPlace ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={statusBadgeTone(selectedStatus ?? "imported")}>
+                        {statusLabel(selectedStatus ?? "imported")}
+                      </Badge>
+                      {selectedCandidate ? (
+                        <Badge className="bg-cyan-100 text-cyan-950">
+                          Candidate {selectedCandidate.status}
+                        </Badge>
+                      ) : null}
+                      {selectedQuest ? (
+                        <Badge className="bg-amber-100 text-amber-950">Live quest</Badge>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-display text-xl text-slate-950">{selectedPlace.name}</p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {selectedPlace.place_type}
+                            {selectedPlace.city ? ` · ${selectedPlace.city}` : ""}
+                            {selectedPlace.state ? ` · ${selectedPlace.state.code}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{formatStateLabel(selectedPlace.state)}</Badge>
+                      </div>
+
+                      <div className="grid gap-2 text-sm text-slate-600">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <MapPin className="size-4 text-slate-500" />
+                          <span>
+                            {selectedPlace.latitude.toFixed(5)}, {selectedPlace.longitude.toFixed(5)}
+                          </span>
+                        </div>
+                        {selectedPlace.address ? <p>{selectedPlace.address}</p> : null}
+                        {selectedPlace.rating !== null ? (
+                          <p>Rating {selectedPlace.rating.toFixed(1)}</p>
+                        ) : null}
+                        {selectedPlace.review_count !== null ? (
+                          <p>{selectedPlace.review_count} reviews</p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3">
+                      <div className="flex flex-wrap gap-3">
+                        <Button asChild className="bg-slate-950 text-white hover:bg-slate-800">
+                          <Link href={`/dashboard/places?edit=${selectedPlace.id}`}>
+                            <Layers3 className="size-4" />
+                            Open place
+                          </Link>
+                        </Button>
+
+                        {selectedCandidate ? (
+                          <Button asChild className="border-slate-200 bg-white text-slate-900 hover:bg-slate-50" variant="outline">
+                            <Link href={`/dashboard/candidates?edit=${selectedCandidate.id}`}>
+                              <Sparkles className="size-4" />
+                              Open candidate
+                            </Link>
+                          </Button>
+                        ) : selectedPlace.is_active && selectedPlace.is_publicly_visitable ? (
+                          <form action={generateQuestCandidateAction}>
+                            <input name="place_id" type="hidden" value={selectedPlace.id} />
+                            <Button type="submit" className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                              <Sparkles className="size-4" />
+                              Generate candidate
+                            </Button>
+                          </form>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                            This place needs to be active and publicly visitable before generating a candidate.
+                          </div>
+                        )}
+
+                        {selectedQuest ? (
+                          <Button asChild className="border-slate-200 bg-white text-slate-900 hover:bg-slate-50" variant="outline">
+                            <Link href={`/dashboard/quests?edit=${selectedQuest.id}`}>
+                              <ArrowRight className="size-4" />
+                              Open live quest
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-600">
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                          Pipeline note
+                        </p>
+                        <p className="mt-2">
+                          {selectedQuest
+                            ? "This place is already published as a live quest."
+                            : selectedCandidate
+                              ? `A ${selectedCandidate.status} candidate already exists for this place.`
+                              : "No candidate exists yet. Generate one from the selected place when it is ready."}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-7 text-slate-500">
+                    Use the map or the list to pick a stored place. The details panel will show
+                    imported state, candidate state, and live quest state in one place.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                      Search results
+                    </p>
+                    <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
+                      Matching stored places
+                    </CardTitle>
+                  </div>
+                  <Badge variant="outline">{searchCounts.matched} results</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredPlaces.length > 0 ? (
+                  <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
+                    {filteredPlaces.map((place) => {
+                      const candidate = candidateByPlaceId.get(place.id) ?? null;
+                      const quest = questByPlaceId.get(place.id) ?? null;
+                      const status = getPlaceStatus(place, candidate, quest);
+                      const isSelected = place.id === selectedPlaceId;
+
+                      return (
+                        <button
+                          key={place.id}
+                          className={`w-full rounded-[1.5rem] border p-4 text-left transition ${
+                            isSelected
+                              ? "border-cyan-300 bg-cyan-50/70 shadow-[0_16px_30px_rgba(14,165,233,0.12)]"
+                              : "border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                          onClick={() => setSelectedPlaceId(place.id)}
+                          type="button"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className={statusBadgeTone(status)}>{statusLabel(status)}</Badge>
+                                <Badge variant="outline">{place.place_type}</Badge>
+                                {place.state ? (
+                                  <Badge variant="outline">{place.state.code}</Badge>
+                                ) : null}
+                              </div>
+                              <div>
+                                <p className="font-display text-lg text-slate-950">{place.name}</p>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  {place.city ?? "Unknown city"}
+                                  {place.state ? `, ${place.state.code}` : ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 text-right text-sm text-slate-500">
+                              <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1">
+                                <MapPin className="size-3.5" />
+                                {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                              </p>
+                              {candidate ? (
+                                <p>{candidate.status} candidate</p>
+                              ) : (
+                                <p>No candidate yet</p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-7 text-slate-500">
+                    No stored places matched this search. Clear the filters or switch to manual add
+                    mode to seed a fresh place.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent className="m-0 space-y-6" value="manual">
+        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card className="overflow-hidden rounded-[2rem] border-white/70 bg-slate-950 text-white shadow-[0_22px_56px_rgba(15,23,42,0.18)]">
+            <CardHeader className="space-y-3 border-b border-white/10 p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-white/10 text-white">Manual add mode</Badge>
+                <Badge className="bg-amber-100 text-amber-950">Drop a pin on the map</Badge>
+                <Badge variant="outline" className="border-white/10 bg-white/5 text-white">
+                  Save place or save + generate candidate
+                </Badge>
+              </div>
+              <CardTitle className="font-display text-2xl tracking-tight">
+                Click the map to seed a new place, then save it into the pipeline
+              </CardTitle>
+              <p className="max-w-3xl text-sm leading-7 text-slate-300">
+                Manual add mode is separate from stored place search. Use it when you already know
+                the location, want to place a pin visually, and then create the place record or
+                place-plus-candidate in one pass.
+              </p>
+            </CardHeader>
+
+            <CardContent className="space-y-4 p-0">
+              <div className="relative min-h-[660px] overflow-hidden">
+                <MapCanvas
+                  draftPin={draftPin}
+                  fallbackCenter={manualCenter}
+                  mode="manual"
+                  onDropPin={handleMapPinDrop}
+                  onSelectPlace={(placeId) => setSelectedPlaceId(placeId)}
+                  places={places}
+                  selectedPlaceId={resolvedSelectedPlaceId}
+                />
+
+                <div className="pointer-events-none absolute left-4 top-4 z-[500] flex flex-wrap gap-2">
+                  <Badge className="bg-slate-950/90 text-white backdrop-blur">
+                    <Pin className="mr-1.5 size-3.5" />
+                    Click the map to drop a pin
+                  </Badge>
+                  {draftPin ? (
+                    <Badge className="bg-amber-100 text-amber-950">Pin placed</Badge>
+                  ) : (
+                    <Badge className="bg-white/90 text-slate-950">No pin yet</Badge>
+                  )}
+                </div>
+
+                <div className="pointer-events-none absolute right-4 top-4 z-[500] rounded-full border border-white/15 bg-slate-950/85 px-4 py-2 text-xs uppercase tracking-[0.24em] text-slate-200 shadow-xl backdrop-blur">
+                  Manual place creation
+                </div>
+
+                {!draftPin ? (
+                  <div className="pointer-events-auto absolute inset-x-4 bottom-4 z-[500] max-w-[460px] rounded-[1.75rem] border border-white/10 bg-slate-950/90 p-4 text-sm leading-7 text-slate-200 shadow-2xl backdrop-blur">
+                    <p className="font-semibold text-white">No pin selected yet.</p>
+                    <p className="mt-1 text-slate-300">
+                      Click anywhere on the map to place the draft pin and populate the place form
+                      on the right.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+            <CardHeader className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                New place form
+              </p>
+              <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
+                Save the pin as a place or place + candidate
+              </CardTitle>
+              <p className="text-sm leading-7 text-slate-600">
+                The pin controls the coordinates. Choose a state, fill in the place details, then
+                save. You can publish a candidate later through the existing review flow.
+              </p>
+            </CardHeader>
+
+            <CardContent>
+              <form action={savePlaceFromMapAction} className="space-y-4">
+                <input name="latitude" type="hidden" value={manualDraft.latitude} />
+                <input name="longitude" type="hidden" value={manualDraft.longitude} />
+                <input name="state_code" type="hidden" value={manualDraft.state_code} />
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="manual-name">Place name</Label>
+                    <Input id="manual-name" name="name" placeholder="Cloud Gate" required />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-place-type">Place type</Label>
+                    <Input
+                      id="manual-place-type"
+                      name="place_type"
+                      placeholder="landmark, cafe, park..."
+                      value={manualDraft.place_type}
+                      onChange={(event) =>
+                        updateManualDraft("place_type", event.target.value)
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-state">State</Label>
+                    <select
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm shadow-sm outline-none transition focus:border-slate-400"
+                      id="manual-state"
+                      name="state_id"
+                      onChange={(event) => {
+                        const nextStateId = event.target.value;
+                        const nextState = stateById.get(nextStateId) ?? null;
+
+                        setManualDraft((current) => ({
+                          ...current,
+                          state_code: nextState?.code ?? "",
+                          state_id: nextStateId,
+                        }));
+                      }}
+                      value={manualDraft.state_id}
+                    >
+                      {states.map((state) => (
+                        <option key={state.id} value={state.id}>
+                          {state.code} · {state.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-city">City</Label>
+                    <Input
+                      id="manual-city"
+                      name="city"
+                      placeholder="Chicago"
+                      value={manualDraft.city}
+                      onChange={(event) => updateManualDraft("city", event.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-address">Address</Label>
+                    <Input
+                      id="manual-address"
+                      name="address"
+                      placeholder="201 E Randolph St"
+                      value={manualDraft.address}
+                      onChange={(event) => updateManualDraft("address", event.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-latitude">Latitude</Label>
+                    <Input
+                      id="manual-latitude"
+                      name="latitude-visible"
+                      onChange={(event) =>
+                        setManualDraft((current) => ({
+                          ...current,
+                          latitude: Number(event.target.value),
+                        }))
+                      }
+                      step="0.000001"
+                      type="number"
+                      value={manualDraft.latitude}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-longitude">Longitude</Label>
+                    <Input
+                      id="manual-longitude"
+                      name="longitude-visible"
+                      onChange={(event) =>
+                        setManualDraft((current) => ({
+                          ...current,
+                          longitude: Number(event.target.value),
+                        }))
+                      }
+                      step="0.000001"
+                      type="number"
+                      value={manualDraft.longitude}
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="manual-description">Description</Label>
+                    <Textarea
+                      id="manual-description"
+                      name="description"
+                      placeholder="Short internal description for admin review and candidate generation."
+                      value={manualDraft.description}
+                      onChange={(event) => updateManualDraft("description", event.target.value)}
+                      rows={4}
+                    />
+                  </div>
+                </div>
+
+                <details className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                    Optional details
+                  </summary>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-website">Website</Label>
+                      <Input
+                        id="manual-website"
+                        name="website"
+                        placeholder="https://example.com"
+                        value={manualDraft.website}
+                        onChange={(event) => updateManualDraft("website", event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-image">Image URL</Label>
+                      <Input
+                        id="manual-image"
+                        name="image_url"
+                        placeholder="https://..."
+                        value={manualDraft.image_url}
+                        onChange={(event) => updateManualDraft("image_url", event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-rating">Rating</Label>
+                      <Input
+                        id="manual-rating"
+                        name="rating"
+                        onChange={(event) => updateManualDraft("rating", event.target.value)}
+                        placeholder="4.7"
+                        step="0.1"
+                        type="number"
+                        value={manualDraft.rating}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-review-count">Review count</Label>
+                      <Input
+                        id="manual-review-count"
+                        name="review_count"
+                        onChange={(event) => updateManualDraft("review_count", event.target.value)}
+                        placeholder="124"
+                        type="number"
+                        value={manualDraft.review_count}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-source">External source</Label>
+                      <Input
+                        id="manual-source"
+                        name="external_source"
+                        placeholder="google_places"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-external-id">External ID</Label>
+                      <Input
+                        id="manual-external-id"
+                        name="external_id"
+                        placeholder="optional source identifier"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="manual-source-metadata">Source metadata JSON</Label>
+                      <Textarea
+                        id="manual-source-metadata"
+                        name="source_metadata"
+                        placeholder='{"note":"manual-seed"}'
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                <div className="flex flex-wrap gap-3">
+                  <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
+                    <input
+                      checked={manualDraft.is_active}
+                      name="is_active"
+                      onChange={(event) => updateManualDraft("is_active", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Active
+                  </label>
+                  <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
+                    <input
+                      checked={manualDraft.is_publicly_visitable}
+                      name="is_publicly_visitable"
+                      onChange={(event) =>
+                        updateManualDraft("is_publicly_visitable", event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    Publicly visitable
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    className="bg-slate-950 text-white hover:bg-slate-800"
+                    type="submit"
+                  >
+                    <Plus className="size-4" />
+                    Save place
+                  </Button>
+                  <Button
+                    className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                    formAction={savePlaceAndGenerateCandidateAction}
+                    type="submit"
+                  >
+                    <Sparkles className="size-4" />
+                    Add + generate candidate
+                  </Button>
+                </div>
+
                 <p className="text-xs leading-6 text-slate-500">
-                  A place created here is saved first, then candidate generation stays admin-controlled.
+                  The map click updates latitude and longitude instantly. Save the place first if
+                  you want to keep it as a place-only record, or use the combined action to create
+                  the place and draft candidate together.
                 </p>
               </form>
             </CardContent>
           </Card>
-        ) : null}
-
-        <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-          <CardHeader className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-              Search results
-            </p>
-            <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-              {formatCount(filteredPlaces.length)} matching places
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="max-h-[360px] space-y-3 overflow-auto pr-1">
-              {filteredPlaces.length > 0 ? (
-                filteredPlaces.map((place) => {
-                  const candidate = candidateByPlaceId.get(place.id) ?? null;
-                  const quest = questByPlaceId.get(place.id) ?? null;
-                  const selected = place.id === selectedPlaceId;
-
-                  return (
-                    <button
-                      key={place.id}
-                      type="button"
-                      onClick={() => setSelectedPlaceId(place.id)}
-                      className={cn(
-                        "w-full rounded-[1.5rem] border p-4 text-left transition",
-                        selected
-                          ? "border-sky-200 bg-sky-50 shadow-[0_10px_24px_rgba(45,183,255,0.12)]"
-                          : "border-slate-200 bg-slate-50/80 hover:border-sky-200 hover:bg-white",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">{place.place_type}</Badge>
-                            {place.state ? (
-                              <Badge variant="outline">{place.state.code}</Badge>
-                            ) : null}
-                            <Badge className={cn("uppercase tracking-[0.2em]", statusTone(getPlaceStatus(place, candidate, quest)))}>
-                              {statusLabel(place, candidate, quest)}
-                            </Badge>
-                          </div>
-                          <div>
-                            <p className="font-display text-lg font-semibold text-slate-950">
-                              {place.name}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-slate-600">
-                              {place.city ?? "Unknown city"}{place.address ? ` · ${place.address}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <ArrowRight className="mt-1 size-4 shrink-0 text-slate-400" />
-                      </div>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-7 text-slate-500">
-                  No places match the current search. Clear the filters or widen the state and type filters.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {selectedPlace ? (
-          <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <CardHeader className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-sky-100 text-sky-900">Selected place</Badge>
-                <Badge variant="outline">Imported as place</Badge>
-                {selectedCandidate ? (
-                  <Badge className="bg-violet-100 text-violet-900">
-                    Candidate {selectedCandidate.status}
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">No candidate yet</Badge>
-                )}
-                {selectedQuest ? (
-                  <Badge className="bg-amber-100 text-amber-900">Live quest</Badge>
-                ) : null}
-              </div>
-
-              <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-                {selectedPlace.name}
-              </CardTitle>
-              <p className="text-sm leading-7 text-slate-600">
-                {selectedPlace.description ?? "This place has no description yet. Add one when editing the place or generate a candidate from the map."}
-              </p>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {selectedPlace.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  alt={selectedPlace.name}
-                  src={selectedPlace.image_url}
-                  className="h-48 w-full rounded-[1.5rem] object-cover"
-                />
-              ) : (
-                <div className="flex h-48 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
-                  No image available
-                </div>
-              )}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Category</p>
-                  <p className="mt-2 font-semibold text-slate-950">{selectedPlace.place_type}</p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Location</p>
-                  <p className="mt-2 font-semibold text-slate-950">
-                    {selectedPlace.address ?? selectedPlace.city ?? "No address"}
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Coordinates</p>
-                  <p className="mt-2 font-semibold text-slate-950">
-                    {selectedPlace.latitude.toFixed(5)}, {selectedPlace.longitude.toFixed(5)}
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">State</p>
-                  <p className="mt-2 font-semibold text-slate-950">
-                    {formatStateLabel(selectedState)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.2em] text-slate-500">
-                <span className="rounded-full bg-slate-100 px-3 py-1">
-                  {selectedPlace.is_active ? "Active" : "Inactive"}
-                </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">
-                  {selectedPlace.is_publicly_visitable ? "Publicly visitable" : "Private"}
-                </span>
-                {selectedPlace.rating !== null ? (
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    {selectedPlace.rating.toFixed(1)} rating
-                  </span>
-                ) : null}
-                {selectedPlace.review_count !== null ? (
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    {selectedPlace.review_count} reviews
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button asChild variant="outline">
-                  <Link href={`/dashboard/places?edit=${selectedPlace.id}`}>
-                    <MapPinned className="size-4" />
-                    Open place
-                  </Link>
-                </Button>
-
-                {selectedCandidate ? (
-                  <Button asChild className="bg-slate-950 text-white hover:bg-slate-800">
-                    <Link href={`/dashboard/candidates?edit=${selectedCandidate.id}`}>
-                      <Layers3 className="size-4" />
-                      Open candidate
-                    </Link>
-                  </Button>
-                ) : selectedQuest ? (
-                  <Button asChild className="bg-amber-500 text-amber-950 hover:bg-amber-400">
-                    <Link href={`/dashboard/quests?edit=${selectedQuest.id}`}>
-                      <MapIcon className="size-4" />
-                      Open quest
-                    </Link>
-                  </Button>
-                ) : selectedPlace.is_active && selectedPlace.is_publicly_visitable ? (
-                  <form action={generateQuestCandidateAction}>
-                    <input type="hidden" name="place_id" value={selectedPlace.id} />
-                    <Button type="submit" className="bg-sky-700 text-white hover:bg-sky-600">
-                      <Sparkles className="size-4" />
-                      Generate candidate
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                    Make the place active and publicly visitable before generating a candidate.
-                  </div>
-                )}
-              </div>
-
-              {!selectedPlaceVisible ? (
-                <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-950">
-                  This selected place is currently hidden by the active filters. Clear or adjust the filters if you want it to stay visible on the map.
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <CardContent className="p-6 text-sm leading-7 text-slate-600">
-              No place is selected yet. Use the map or the results list to inspect a place, or click on empty map space to create a new pin.
-            </CardContent>
-          </Card>
-        )}
-      </aside>
-    </div>
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 }
