@@ -21,6 +21,12 @@ const banners = {
     body: "The metadata or rule JSON could not be parsed. Fix the syntax and submit again.",
     tone: "warning",
   },
+  "state-invalid": {
+    icon: AlertCircle,
+    title: "State values need attention",
+    body: "The selected state ID or state code could not be resolved. Pick a valid state and try again.",
+    tone: "warning",
+  },
   "demo-disabled": {
     icon: AlertCircle,
     title: "Demo mode unavailable",

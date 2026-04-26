@@ -19,6 +19,7 @@ import {
   savePlaceAndGenerateCandidateAction,
   savePlaceFromMapAction,
 } from "@/lib/admin/actions";
+import { derivePublicPlaceDescription } from "@/lib/admin/place-content";
 import { GoogleMapCanvas } from "@/components/admin/google-map-canvas";
 import {
   buildGoogleResultDistanceMiles,
@@ -248,7 +249,15 @@ function buildStoredDraft(place: PlaceWithRelations): PlaceDraft {
   return {
     address: place.address ?? "",
     city: place.city ?? "",
-    description: place.description ?? "",
+    description:
+      place.description ??
+      derivePublicPlaceDescription({
+        address: place.address,
+        city: place.city,
+        name: place.name,
+        place_type: place.place_type,
+        state_code: place.state_code ?? place.state?.code ?? null,
+      }),
     external_id: place.external_id ?? "",
     external_source: place.external_source ?? "",
     id: place.id,
@@ -272,7 +281,7 @@ function buildStoredDraft(place: PlaceWithRelations): PlaceDraft {
   };
 }
 
-function buildManualDraft(center: GoogleSearchCenter, state: StateRecord): PlaceDraft {
+function buildManualDraft(center: GoogleSearchCenter, state: StateRecord | null): PlaceDraft {
   return {
     address: "",
     city: center.label.split(",")[0]?.trim() ?? "",
@@ -298,8 +307,8 @@ function buildManualDraft(center: GoogleSearchCenter, state: StateRecord): Place
       null,
       2,
     ),
-    state_code: state.code,
-    state_id: state.id,
+    state_code: state?.code ?? "",
+    state_id: state?.id ?? "",
     website: "",
   };
 }
@@ -307,7 +316,7 @@ function buildManualDraft(center: GoogleSearchCenter, state: StateRecord): Place
 function buildGoogleDraft(
   result: GoogleNearbyBusinessResult,
   detail: google.maps.places.PlaceResult | null,
-  state: StateRecord,
+  state: StateRecord | null,
   center: GoogleSearchCenter,
   existingPlace: PlaceWithRelations | null,
   searchQuery: string,
@@ -324,7 +333,7 @@ function buildGoogleDraft(
     "";
   const stateCodeFromAddress =
     detail?.address_components?.find((component) => component.types.includes("administrative_area_level_1"))
-      ?.short_name ?? result.stateCode ?? existingPlace?.state_code ?? state.code;
+      ?.short_name ?? result.stateCode ?? existingPlace?.state_code ?? null;
   const type = detail?.types?.[0] ?? result.primaryType ?? result.placeTypes[0] ?? "landmark";
 
   return {
@@ -332,7 +341,13 @@ function buildGoogleDraft(
     city,
     description:
       existingPlace?.description?.trim() ||
-      `Discovered through Google Maps near ${center.label}. Use it as a place source for a quest candidate.`,
+      derivePublicPlaceDescription({
+        address,
+        city,
+        name: detail?.name ?? result.name,
+        place_type: type,
+        state_code: stateCodeFromAddress,
+      }),
     external_id: existingPlace?.external_id ?? result.placeId,
     external_source: existingPlace?.external_source ?? "google_places",
     id: existingPlace?.id ?? "",
@@ -384,8 +399,12 @@ function buildGoogleDraft(
       null,
       2,
     ),
-    state_code: existingPlace?.state_code ?? stateCodeFromAddress ?? state.code,
-    state_id: existingPlace?.state_id ?? state.id,
+    state_code: existingPlace?.state_code ?? stateCodeFromAddress ?? "",
+    state_id:
+      existingPlace?.state_id ??
+      (state?.code && stateCodeFromAddress && state.code === stateCodeFromAddress
+        ? state.id
+        : ""),
     website: existingPlace?.website ?? detail?.website ?? result.website ?? "",
   };
 }
@@ -811,11 +830,7 @@ export function AdminMapExplorer({
   const [storedSelectedId, setStoredSelectedId] = useState<string | null>(null);
 
   const [manualDraft, setManualDraft] = useState<PlaceDraft>(() =>
-    buildManualDraft(DEFAULT_CENTER, preferredState ?? states[0] ?? {
-      id: "",
-      code: "IL",
-      name: "Illinois",
-    }),
+    buildManualDraft(DEFAULT_CENTER, preferredState ?? states[0] ?? null),
   );
   const [manualPin, setManualPin] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -852,6 +867,8 @@ export function AdminMapExplorer({
   const selectedStoredQuest = selectedStoredPlace
     ? questByPlaceId.get(selectedStoredPlace.id) ?? null
     : null;
+  const googleSelectedState = stateById.get(googleSearch.stateId) ?? null;
+  const manualSelectedState = stateById.get(manualDraft.state_id) ?? null;
 
   const googleCenter = googleSearch.center ?? DEFAULT_CENTER;
   const storedCenter = storedResults[0]
@@ -859,8 +876,8 @@ export function AdminMapExplorer({
         latitude: storedResults[0].latitude,
         longitude: storedResults[0].longitude,
         label: storedResults[0].city
-          ? `${storedResults[0].city}, ${storedResults[0].state_code ?? stateById.get(storedSearch.stateId)?.code ?? DEFAULT_CENTER.stateCode}`
-          : stateById.get(storedSearch.stateId)?.name ?? DEFAULT_CENTER.label,
+          ? `${storedResults[0].city}${storedResults[0].state_code ? `, ${storedResults[0].state_code}` : storedResults[0].state?.code ? `, ${storedResults[0].state.code}` : ""}`
+          : storedResults[0].state?.name ?? DEFAULT_CENTER.label,
       }
     : DEFAULT_CENTER;
 
@@ -908,11 +925,7 @@ export function AdminMapExplorer({
     setGoogleResultState((current) => ({ ...current, selectedId: result.id }));
     setGoogleDetailState({ data: null, error: null, status: "loading" });
 
-    const safeState = stateById.get(googleSearch.stateId) ?? preferredState ?? states[0] ?? {
-      id: "",
-      code: "IL",
-      name: "Illinois",
-    };
+    const safeState = googleSelectedState;
 
     const googleMaps = googleApi.google?.maps ?? null;
 
@@ -987,7 +1000,7 @@ export function AdminMapExplorer({
       return;
     }
 
-    const selectedStateForSearch = stateById.get(googleSearch.stateId) ?? preferredState ?? states[0] ?? null;
+    const selectedStateForSearch = googleSelectedState;
 
     if (!selectedStateForSearch) {
       setGoogleSearch((current) => ({
@@ -1128,7 +1141,7 @@ export function AdminMapExplorer({
   }
 
   function handleManualMapClick(point: { latitude: number; longitude: number }) {
-    const state = stateById.get(manualDraft.state_id) ?? preferredState ?? states[0] ?? null;
+    const state = manualSelectedState;
 
     if (!state) {
       return;
@@ -1229,8 +1242,8 @@ export function AdminMapExplorer({
             latitude: storedResults[0].latitude,
             longitude: storedResults[0].longitude,
             label: storedResults[0].city
-              ? `${storedResults[0].city}, ${storedResults[0].state_code ?? storedSelectedState?.code ?? DEFAULT_CENTER.stateCode}`
-              : storedSelectedState?.name ?? DEFAULT_CENTER.label,
+              ? `${storedResults[0].city}${storedResults[0].state_code ? `, ${storedResults[0].state_code}` : storedResults[0].state?.code ? `, ${storedResults[0].state.code}` : ""}`
+              : storedResults[0].state?.name ?? DEFAULT_CENTER.label,
           }
         : DEFAULT_CENTER;
     }
@@ -1253,8 +1266,6 @@ export function AdminMapExplorer({
     manualDraft.longitude,
     manualPin,
     storedResults,
-    storedSelectedState?.code,
-    storedSelectedState?.name,
   ]);
 
   useEffect(() => {
@@ -1296,7 +1307,7 @@ export function AdminMapExplorer({
         return;
       }
 
-      const selectedStateForSearch = stateById.get(googleSearch.stateId) ?? preferredState ?? states[0] ?? null;
+      const selectedStateForSearch = googleSelectedState;
 
       if (!selectedStateForSearch) {
         return;
@@ -1877,11 +1888,11 @@ export function AdminMapExplorer({
                               type="hidden"
                               value={googleResultState.draft?.external_id ?? selectedGoogleResult.placeId}
                             />
-                            <input name="state_id" type="hidden" value={googleResultState.draft?.state_id ?? storedSearch.stateId} />
+                            <input name="state_id" type="hidden" value={googleResultState.draft?.state_id ?? googleSelectedState?.id ?? ""} />
                             <input
                               name="state_code"
                               type="hidden"
-                              value={googleResultState.draft?.state_code ?? storedSelectedState?.code ?? ""}
+                              value={googleResultState.draft?.state_code ?? googleSelectedState?.code ?? ""}
                             />
                             <PlaceEditorFields
                               draft={
@@ -1889,11 +1900,7 @@ export function AdminMapExplorer({
                                 buildGoogleDraft(
                                   selectedGoogleResult,
                                   googleDetailState.data,
-                                  storedSelectedState ?? preferredState ?? states[0] ?? {
-                                    id: "",
-                                    code: "IL",
-                                    name: "Illinois",
-                                  },
+                                  googleSelectedState,
                                   googleSearch.center ?? DEFAULT_CENTER,
                                   selectedGoogleMatch,
                                   googleSearch.locationQuery,
@@ -1906,11 +1913,7 @@ export function AdminMapExplorer({
                                     buildGoogleDraft(
                                       selectedGoogleResult,
                                       googleDetailState.data,
-                                      storedSelectedState ?? preferredState ?? states[0] ?? {
-                                        id: "",
-                                        code: "IL",
-                                        name: "Illinois",
-                                      },
+                                      googleSelectedState,
                                       googleSearch.center ?? DEFAULT_CENTER,
                                       selectedGoogleMatch,
                                       googleSearch.locationQuery,
@@ -2324,16 +2327,12 @@ export function AdminMapExplorer({
                         className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm shadow-sm outline-none transition focus:border-slate-400"
                         id="manual-state"
                         onChange={(event) => {
-                          const nextState = stateById.get(event.target.value) ?? preferredState ?? states[0] ?? null;
-
-                          if (!nextState) {
-                            return;
-                          }
+                          const nextState = stateById.get(event.target.value) ?? null;
 
                           setManualDraft((current) => ({
                             ...current,
-                            state_code: nextState.code,
-                            state_id: nextState.id,
+                            state_code: nextState?.code ?? "",
+                            state_id: nextState?.id ?? "",
                           }));
                         }}
                         value={manualDraft.state_id}

@@ -17,6 +17,7 @@ import { redirect } from "next/navigation";
 
 import { clearDemoSession, requireAdminSession } from "./auth";
 import { enableAdminDemoMode, isAdminDemoEnabled } from "./demo";
+import { derivePublicPlaceDescription } from "./place-content";
 import {
   generateQuestCandidateFromPlace,
   generateNearbyQuestCandidatesFromSearch,
@@ -43,7 +44,9 @@ function readBoolean(formData: FormData, key: string) {
 }
 
 function readNumber(formData: FormData, key: string) {
-  return Number(readString(formData, key));
+  const value = readString(formData, key);
+
+  return value ? Number(value) : Number.NaN;
 }
 
 function readOptionalNumber(formData: FormData, key: string) {
@@ -68,6 +71,48 @@ function parseJson(value?: string) {
   }
 
   return JSON.parse(value) as Record<string, unknown>;
+}
+
+function parseJsonOrNull(value?: string) {
+  if (!value || !value.trim()) {
+    return null;
+  }
+
+  return JSON.parse(value) as Record<string, unknown>;
+}
+
+function normalizeSourceMetadata(value: unknown) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return { raw_value: trimmed };
+    }
+  }
+
+  return null;
+}
+
+function isStateReferenceError(error: unknown) {
+  return error instanceof Error && error.message.startsWith("State ");
 }
 
 function parseImportPayload(value?: string) {
@@ -106,6 +151,7 @@ function parsePlacePayload(formData: FormData) {
     latitude: readNumber(formData, "latitude"),
     longitude: readNumber(formData, "longitude"),
     name: readString(formData, "name"),
+    public_description: readString(formData, "public_description"),
     phone: readString(formData, "phone"),
     place_type: readString(formData, "place_type"),
     price_level: readOptionalNumber(formData, "price_level"),
@@ -119,42 +165,69 @@ function parsePlacePayload(formData: FormData) {
 }
 
 function normalizeImportedPlace(row: Record<string, unknown>) {
+  const sourceMetadata = normalizeSourceMetadata(row.source_metadata);
+  const publicDescription =
+    typeof row.public_description === "string" && row.public_description.trim()
+      ? row.public_description.trim()
+      : typeof row.description === "string" && row.description.trim()
+        ? row.description.trim()
+        : "";
+  const derivedDescription = derivePublicPlaceDescription({
+    address: typeof row.address === "string" ? row.address : "",
+    city: typeof row.city === "string" ? row.city : "",
+    name: typeof row.name === "string" ? row.name : "",
+    place_type: typeof row.place_type === "string" ? row.place_type : "",
+    state_code: typeof row.state_code === "string" ? row.state_code : "",
+  });
+  const parseImportedNumber = (value: unknown) => {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : Number.NaN;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+
+      return trimmed ? Number(trimmed) : Number.NaN;
+    }
+
+    return Number.NaN;
+  };
+
   return {
     address: typeof row.address === "string" ? row.address : "",
     city: typeof row.city === "string" ? row.city : "",
-    description: typeof row.description === "string" ? row.description : "",
+    description: publicDescription || derivedDescription,
     external_id: typeof row.external_id === "string" ? row.external_id : "",
     external_source: typeof row.external_source === "string" ? row.external_source : "",
     id: typeof row.id === "string" ? row.id : undefined,
     image_url: typeof row.image_url === "string" ? row.image_url : "",
     is_active: row.is_active !== false,
     is_publicly_visitable: row.is_publicly_visitable !== false,
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
+    latitude: parseImportedNumber(row.latitude),
+    longitude: parseImportedNumber(row.longitude),
     name: typeof row.name === "string" ? row.name : "",
     phone: typeof row.phone === "string" ? row.phone : "",
     place_type: typeof row.place_type === "string" ? row.place_type : "",
     price_level:
       row.price_level === undefined || row.price_level === null || row.price_level === ""
         ? null
-        : Number(row.price_level),
+        : parseImportedNumber(row.price_level),
     rating:
       row.rating === undefined || row.rating === null || row.rating === ""
         ? null
-        : Number(row.rating),
-    source_metadata:
-      row.source_metadata && typeof row.source_metadata === "object"
-        ? JSON.stringify(row.source_metadata)
-        : typeof row.source_metadata === "string"
-          ? row.source_metadata
-          : "",
+        : parseImportedNumber(row.rating),
+    source_metadata: JSON.stringify({
+      ...(sourceMetadata ?? {}),
+      description_source: publicDescription ? "provided" : "derived",
+      import_mode: "json",
+    }),
     state_code: typeof row.state_code === "string" ? row.state_code : "",
     state_id: typeof row.state_id === "string" ? row.state_id : "",
     website: typeof row.website === "string" ? row.website : "",
     review_count:
       row.review_count === undefined || row.review_count === null || row.review_count === ""
         ? null
-        : Number(row.review_count),
+        : parseImportedNumber(row.review_count),
   };
 }
 
@@ -274,10 +347,12 @@ export async function savePlaceAction(formData: FormData) {
   }
 
   try {
+    const description = toNullable(parsed.data.description) ?? toNullable(parsed.data.public_description);
+
     await savePlace({
       address: toNullable(parsed.data.address),
       city: toNullable(parsed.data.city),
-      description: toNullable(parsed.data.description),
+      description,
       external_id: toNullable(parsed.data.external_id),
       external_source: toNullable(parsed.data.external_source),
       id: parsed.data.id,
@@ -298,6 +373,10 @@ export async function savePlaceAction(formData: FormData) {
       website: toNullable(parsed.data.website),
     });
   } catch (error) {
+    if (isStateReferenceError(error)) {
+      redirect("/dashboard/places?error=state-invalid");
+    }
+
     redirect(
       `/dashboard/places?error=${
         error instanceof Error && error.message.includes("duplicate")
@@ -366,7 +445,11 @@ export async function importPlacesAction(formData: FormData) {
 
   try {
     await importPlaces(normalizedPlaces);
-  } catch {
+  } catch (error) {
+    if (isStateReferenceError(error)) {
+      redirect("/dashboard/places?error=state-invalid");
+    }
+
     redirect("/dashboard/places?error=check-form");
   }
 
@@ -448,10 +531,12 @@ export async function savePlaceFromMapAction(formData: FormData) {
   }
 
   try {
+    const description = toNullable(parsed.data.description) ?? toNullable(parsed.data.public_description);
+
     await savePlace({
       address: toNullable(parsed.data.address),
       city: toNullable(parsed.data.city),
-      description: toNullable(parsed.data.description),
+      description,
       external_id: toNullable(parsed.data.external_id),
       external_source: toNullable(parsed.data.external_source),
       id: parsed.data.id,
@@ -471,7 +556,11 @@ export async function savePlaceFromMapAction(formData: FormData) {
       state_id: toNullable(parsed.data.state_id),
       website: toNullable(parsed.data.website),
     });
-  } catch {
+  } catch (error) {
+    if (isStateReferenceError(error)) {
+      redirect("/dashboard/places/map?error=state-invalid");
+    }
+
     redirect("/dashboard/places/map?error=check-form");
   }
 
@@ -491,10 +580,12 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
   }
 
   try {
+    const description = toNullable(parsed.data.description) ?? toNullable(parsed.data.public_description);
+
     const savedPlace = await savePlace({
       address: toNullable(parsed.data.address),
       city: toNullable(parsed.data.city),
-      description: toNullable(parsed.data.description),
+      description,
       external_id: toNullable(parsed.data.external_id),
       external_source: toNullable(parsed.data.external_source),
       id: parsed.data.id,
@@ -526,7 +617,11 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
     revalidatePath("/dashboard/places/map");
     revalidatePath("/dashboard/candidates");
     redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
-  } catch {
+  } catch (error) {
+    if (isStateReferenceError(error)) {
+      redirect("/dashboard/places/map?error=state-invalid");
+    }
+
     redirect("/dashboard/places/map?error=check-form");
   }
 }
@@ -609,12 +704,26 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
 
 export async function saveQuestCandidateAction(formData: FormData) {
   const session = await requireAdminSession();
+  const candidateId = readString(formData, "id") || undefined;
+  const generationNotesRaw = readString(formData, "generation_notes");
+  const existing = candidateId
+    ? (await listQuestCandidates()).find((candidate) => candidate.id === candidateId)
+    : null;
+  let generationNotes: Record<string, unknown> | null = null;
+
+  try {
+    generationNotes = parseJsonOrNull(generationNotesRaw);
+  } catch {
+    generationNotes = existing?.generation_notes
+      ? parseJsonOrNull(JSON.stringify(existing.generation_notes))
+      : null;
+  }
 
   const parsed = questCandidateFormSchema.safeParse({
     description: readString(formData, "description"),
     generation_method: readString(formData, "generation_method"),
-    generation_notes: readString(formData, "generation_notes"),
-    id: readString(formData, "id") || undefined,
+    generation_notes: generationNotesRaw,
+    id: candidateId,
     place_id: readString(formData, "place_id"),
     published_quest_id: readString(formData, "published_quest_id"),
     discovery_type: readString(formData, "discovery_type"),
@@ -630,10 +739,6 @@ export async function saveQuestCandidateAction(formData: FormData) {
   if (!parsed.success) {
     redirect("/dashboard/candidates?error=check-form");
   }
-
-  const existing = parsed.data.id
-    ? (await listQuestCandidates()).find((candidate) => candidate.id === parsed.data.id)
-    : null;
 
   if (parsed.data.status === "published") {
     if (!parsed.data.id) {
@@ -668,7 +773,7 @@ export async function saveQuestCandidateAction(formData: FormData) {
   try {
     await saveQuestCandidate({
       ...parsed.data,
-      generation_notes: parseJson(parsed.data.generation_notes),
+      generation_notes: generationNotes,
       published_quest_id: existing?.published_quest_id ?? null,
       reviewed_at: reviewedAt,
       reviewed_by: reviewedBy,

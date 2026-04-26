@@ -31,6 +31,7 @@ import type {
 } from "@rovexp/types";
 
 import { getMockAdminStore } from "./mock-store";
+import { derivePublicPlaceDescription, resolvePlaceStateReference } from "./place-content";
 import { getSupabaseServerClient, isSupabaseConfigured } from "./supabase";
 
 export interface DashboardSummary {
@@ -2144,15 +2145,29 @@ export async function saveSponsor(payload: SponsorPayload) {
 export async function savePlace(payload: PlacePayload) {
   const supabase = await getServerClientOrNull();
   const states = await listStates();
+  const stateReference = resolvePlaceStateReference(
+    {
+      state_code: payload.state_code,
+      state_id: payload.state_id,
+    },
+    states,
+  );
+  const description =
+    payload.description?.trim() ||
+    derivePublicPlaceDescription({
+      address: payload.address,
+      city: payload.city,
+      name: payload.name,
+      place_type: payload.place_type,
+      state_code: stateReference.state_code ?? payload.state_code ?? null,
+    });
   const normalizedPayload: PlacePayload = {
     ...payload,
     external_id: payload.external_id ?? null,
     external_source: payload.external_source ?? null,
-    state_code:
-      payload.state_code ??
-      (payload.state_id
-        ? states.find((state) => state.id === payload.state_id)?.code ?? null
-        : null),
+    description,
+    state_code: stateReference.state_code,
+    state_id: stateReference.state_id,
   };
 
   if (!supabase) {

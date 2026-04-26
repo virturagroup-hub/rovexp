@@ -140,6 +140,16 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                             <Badge variant="outline">
                               {place.state.code} · {place.state.name}
                             </Badge>
+                          ) : place.state_id || place.state_code ? (
+                            <Badge className="bg-rose-100 text-rose-950">State unresolved</Badge>
+                          ) : null}
+                          {place.source_metadata &&
+                          typeof place.source_metadata === "object" &&
+                          !Array.isArray(place.source_metadata) &&
+                          place.source_metadata.description_source === "derived" ? (
+                            <Badge className="bg-amber-100 text-amber-950">
+                              Description derived
+                            </Badge>
                           ) : null}
                           <Badge
                             variant={place.is_active ? "default" : "secondary"}
@@ -160,17 +170,17 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                           ) : (
                             <Badge variant="secondary">No candidate yet</Badge>
                           )}
-                        </div>
+                          </div>
 
-                        <div>
-                          <p className="font-display text-xl font-semibold text-slate-950">
-                            {place.name}
-                          </p>
-                          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-                            {place.description ?? "No public description yet. Add one to help candidate generation feel more intentional."}
-                          </p>
+                          <div>
+                            <p className="font-display text-xl font-semibold text-slate-950">
+                              {place.name}
+                            </p>
+                            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+                              {place.description ?? "No public description yet. Add one to help candidate generation feel more intentional."}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
                       <div className="flex flex-col gap-2">
                         {candidate ? (
@@ -475,6 +485,9 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       {
                         name: "Example cafe",
                         place_type: "cafe",
+                        public_description:
+                          "A neighborhood cafe that feels like a natural stop on a local quest route.",
+                        state_code: "IL",
                         latitude: 41.88,
                         longitude: -87.62,
                         city: "Chicago",
@@ -490,8 +503,11 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                   className="min-h-[240px] border-white/10 bg-white/5 text-white placeholder:text-slate-400"
                 />
                 <p className="text-sm leading-7 text-slate-300">
-                  Include one object or an array of objects. The importer will upsert
-                  each record and keep the place pipeline admin-controlled.
+                  Include one object or an array of objects. The importer will upsert each record
+                  and keep the place pipeline admin-controlled. `description` or
+                  `public_description` is optional, and the importer will derive a public
+                  description when one is missing. If `state_id` and `state_code` are both set,
+                  they must resolve to the same state.
                 </p>
                 <SubmitButton>
                   <Plus className="size-4" />
