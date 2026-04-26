@@ -1468,6 +1468,12 @@ async function generateQuestCandidateFromPlaceRecord(
     return existingCandidate;
   }
 
+  const existingQuest = context.quests.find((quest) => quest.place_id === place.id);
+
+  if (existingQuest) {
+    throw new Error("This place already has a live quest.");
+  }
+
   if (!place.is_active || !place.is_publicly_visitable) {
     throw new Error("Only active public places can become quest candidates.");
   }
@@ -1509,13 +1515,7 @@ async function generateQuestCandidateFromPlaceRecord(
     return nextCandidate;
   }
 
-  const { data, error } = await context.supabase
-    .from("quest_candidates")
-    .insert(payload)
-    .select(
-      `*, place:places(*, state:states(*)), suggested_category:quest_categories(*), sponsor_business:sponsor_businesses(*), ${publishedQuestSelect}`,
-    )
-    .single();
+  const { error } = await context.supabase.from("quest_candidates").insert(payload);
 
   if (error) {
     if (isDuplicateCandidateInsertError(error)) {
@@ -1532,7 +1532,15 @@ async function generateQuestCandidateFromPlaceRecord(
     throw new Error(error.message);
   }
 
-  const nextCandidate = data as QuestCandidateWithRelations;
+  const nextCandidate =
+    (await listQuestCandidates()).find((candidate) => candidate.place_id === place.id) ??
+    context.candidates.find((candidate) => candidate.place_id === place.id) ??
+    null;
+
+  if (!nextCandidate) {
+    throw new Error("Quest candidate was created but could not be loaded.");
+  }
+
   context.candidates = [nextCandidate, ...context.candidates];
 
   return nextCandidate;
@@ -2229,6 +2237,45 @@ export async function savePlace(payload: PlacePayload) {
   }
 
   return data as PlaceWithRelations;
+}
+
+export async function deletePlace(placeId: string) {
+  const supabase = await getServerClientOrNull();
+
+  if (!supabase) {
+    const store = getMockAdminStore();
+    const timestamp = nowIso();
+    const removedCandidateIds = new Set(
+      store.questCandidates
+        .filter((candidate) => candidate.place_id === placeId)
+        .map((candidate) => candidate.id),
+    );
+
+    store.places = store.places.filter((place) => place.id !== placeId);
+    store.questCandidates = store.questCandidates.filter(
+      (candidate) => candidate.place_id !== placeId,
+    );
+    store.quests = store.quests.map((quest) =>
+      quest.place_id === placeId || (quest.quest_candidate_id ? removedCandidateIds.has(quest.quest_candidate_id) : false)
+        ? {
+            ...quest,
+            place_id: null,
+            quest_candidate_id: removedCandidateIds.has(quest.quest_candidate_id ?? "")
+              ? null
+              : quest.quest_candidate_id ?? null,
+            updated_at: timestamp,
+          }
+        : quest,
+    );
+
+    return;
+  }
+
+  const { error } = await supabase.from("places").delete().eq("id", placeId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function importPlaces(payloads: PlacePayload[]) {

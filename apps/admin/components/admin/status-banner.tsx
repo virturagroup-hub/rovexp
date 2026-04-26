@@ -39,6 +39,12 @@ const banners = {
     body: "You are exploring a mock-backed walkthrough. Sign out to return to the live admin path.",
     tone: "info",
   },
+  deleted: {
+    icon: CheckCircle2,
+    title: "Place deleted",
+    body: "The place has been removed from the pipeline.",
+    tone: "success",
+  },
   generated: {
     icon: CheckCircle2,
     title: "Candidate generated",
@@ -99,6 +105,12 @@ const banners = {
     body: "Only active, publicly visitable places can be turned into quest candidates.",
     tone: "warning",
   },
+  "place-already-published": {
+    icon: CheckCircle2,
+    title: "Place already has a live quest",
+    body: "Open the quest editor instead of generating another candidate from this place.",
+    tone: "info",
+  },
   "candidate-duplicate": {
     icon: CheckCircle2,
     title: "Candidate already exists",
@@ -111,6 +123,12 @@ const banners = {
     body: "Something unexpected blocked the place from becoming a candidate. Check the place details and try again.",
     tone: "warning",
   },
+  "place-delete-failed": {
+    icon: AlertCircle,
+    title: "Place deletion failed",
+    body: "Something blocked this place from being removed. Check the source record and try again.",
+    tone: "warning",
+  },
   "signed-out": {
     icon: CheckCircle2,
     title: "Signed out",
@@ -121,9 +139,10 @@ const banners = {
 
 interface StatusBannerProps {
   code?: string;
+  detail?: string;
 }
 
-export function StatusBanner({ code }: StatusBannerProps) {
+export function StatusBanner({ code, detail }: StatusBannerProps) {
   if (!code) {
     return null;
   }
@@ -152,7 +171,7 @@ export function StatusBanner({ code }: StatusBannerProps) {
       </div>
       <div className="space-y-1">
         <p className="font-semibold">{banner.title}</p>
-        <p className="leading-6 opacity-90">{banner.body}</p>
+        <p className="leading-6 opacity-90">{detail ?? banner.body}</p>
       </div>
     </div>
   );

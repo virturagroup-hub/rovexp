@@ -13,32 +13,38 @@ import {
   importPlacesAction,
   savePlaceAction,
 } from "@/lib/admin/actions";
-import { listPlaces, listQuestCandidates, listStates } from "@/lib/admin/repository";
+import { listPlaces, listQuestCandidates, listQuests, listStates } from "@/lib/admin/repository";
+import { PlaceEditorDialog } from "@/components/admin/place-editor-dialog";
 
 interface PlacesPageProps {
   searchParams: Promise<{
     edit?: string;
     error?: string;
+    detail?: string;
     status?: string;
   }>;
 }
 
 export default async function PlacesPage({ searchParams }: PlacesPageProps) {
   const params = await searchParams;
-  const [places, candidates, states] = await Promise.all([
+  const [places, candidates, quests, states] = await Promise.all([
     listPlaces(),
     listQuestCandidates(),
+    listQuests(),
     listStates(),
   ]);
-
-  const editing = places.find((item) => item.id === params.edit) ?? null;
   const candidateByPlaceId = new Map(candidates.map((candidate) => [candidate.place_id, candidate]));
+  const questByPlaceId = new Map(
+    quests
+      .filter((quest) => Boolean(quest.place_id))
+      .map((quest) => [quest.place_id as string, quest]),
+  );
   const activeCount = places.filter((place) => place.is_active).length;
   const publicCount = places.filter((place) => place.is_publicly_visitable).length;
 
   return (
     <div className="space-y-6">
-      <StatusBanner code={params.error ?? params.status} />
+      <StatusBanner code={params.error ?? params.status} detail={params.detail} />
 
       <section className="grid gap-4 md:grid-cols-4">
         {[
@@ -121,6 +127,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
             {places.length > 0 ? (
               places.map((place) => {
                 const candidate = candidateByPlaceId.get(place.id) ?? null;
+                const quest = questByPlaceId.get(place.id) ?? null;
                 const eligible =
                   place.is_active &&
                   place.is_publicly_visitable &&
@@ -170,6 +177,11 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                           ) : (
                             <Badge variant="secondary">No candidate yet</Badge>
                           )}
+                          {quest ? (
+                            <Badge className="bg-emerald-100 text-emerald-900">
+                              Live quest
+                            </Badge>
+                          ) : null}
                           </div>
 
                           <div>
@@ -183,6 +195,14 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                         </div>
 
                       <div className="flex flex-col gap-2">
+                        <PlaceEditorDialog
+                          candidate={candidate}
+                          defaultOpen={params.edit === place.id}
+                          place={place}
+                          quest={quest}
+                          states={states}
+                        />
+
                         {candidate ? (
                           <Button asChild variant="outline">
                             <Link href={`/dashboard/candidates?edit=${candidate.id}`}>
@@ -203,6 +223,15 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                             Needs public access and coordinates
                           </div>
                         )}
+
+                        {quest ? (
+                          <Button asChild variant="outline">
+                            <Link href={`/dashboard/quests?edit=${quest.id}`}>
+                              <Sparkles className="size-4" />
+                              Open quest
+                            </Link>
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -242,33 +271,36 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
           <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
             <CardHeader className="space-y-2">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                {editing ? "Edit place" : "Create place"}
+                Create place
               </p>
               <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-                {editing ? editing.name : "New nearby place"}
+                New nearby place
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form action={savePlaceAction} className="space-y-4">
-                <input type="hidden" name="id" value={editing?.id ?? ""} />
+                <input type="hidden" name="id" value="" />
 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">
                     Place name
                   </label>
-                  <Input name="name" defaultValue={editing?.name ?? ""} required />
+                  <Input name="name" defaultValue="" required />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">
-                    Description
+                    Public description
                   </label>
                   <Textarea
-                    name="description"
-                    defaultValue={editing?.description ?? ""}
+                    name="public_description"
+                    defaultValue=""
                     placeholder="Why is this place worth turning into a quest candidate?"
                     rows={4}
                   />
+                  <p className="text-xs leading-6 text-slate-500">
+                    Leave it blank and RoveXP will derive a safe public description for the place.
+                  </p>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -278,7 +310,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     </label>
                     <Input
                       name="place_type"
-                      defaultValue={editing?.place_type ?? ""}
+                      defaultValue=""
                       placeholder="landmark, cafe, park, mural..."
                       required
                     />
@@ -289,7 +321,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     </label>
                     <select
                       name="state_id"
-                      defaultValue={editing?.state_id ?? ""}
+                      defaultValue=""
                       className="flex h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm shadow-xs"
                     >
                       <option value="">Select state</option>
@@ -311,7 +343,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       name="latitude"
                       type="number"
                       step="0.000001"
-                      defaultValue={editing?.latitude ?? ""}
+                      defaultValue=""
                       required
                     />
                   </div>
@@ -323,7 +355,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       name="longitude"
                       type="number"
                       step="0.000001"
-                      defaultValue={editing?.longitude ?? ""}
+                      defaultValue=""
                       required
                     />
                   </div>
@@ -334,13 +366,13 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     <label className="text-sm font-semibold text-slate-700">
                       Address
                     </label>
-                    <Input name="address" defaultValue={editing?.address ?? ""} />
+                    <Input name="address" defaultValue="" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">
                       City
                     </label>
-                    <Input name="city" defaultValue={editing?.city ?? ""} />
+                    <Input name="city" defaultValue="" />
                   </div>
                 </div>
 
@@ -355,7 +387,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       step="0.1"
                       min="0"
                       max="5"
-                      defaultValue={editing?.rating ?? ""}
+                      defaultValue=""
                     />
                   </div>
                   <div className="space-y-2">
@@ -366,7 +398,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       name="review_count"
                       type="number"
                       min="0"
-                      defaultValue={editing?.review_count ?? ""}
+                      defaultValue=""
                     />
                   </div>
                   <div className="space-y-2">
@@ -378,7 +410,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                       type="number"
                       min="0"
                       max="4"
-                      defaultValue={editing?.price_level ?? ""}
+                      defaultValue=""
                     />
                   </div>
                 </div>
@@ -391,7 +423,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     <Input
                       name="website"
                       type="url"
-                      defaultValue={editing?.website ?? ""}
+                      defaultValue=""
                       placeholder="https://..."
                     />
                   </div>
@@ -399,7 +431,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     <label className="text-sm font-semibold text-slate-700">
                       Phone
                     </label>
-                    <Input name="phone" defaultValue={editing?.phone ?? ""} />
+                    <Input name="phone" defaultValue="" />
                   </div>
                 </div>
 
@@ -407,12 +439,12 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                   <label className="text-sm font-semibold text-slate-700">
                     Image URL
                   </label>
-                  <Input
-                    name="image_url"
-                    type="url"
-                    defaultValue={editing?.image_url ?? ""}
-                    placeholder="https://..."
-                  />
+                    <Input
+                      name="image_url"
+                      type="url"
+                      defaultValue=""
+                      placeholder="https://..."
+                    />
                 </div>
 
                 <div className="space-y-2">
@@ -421,11 +453,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                   </label>
                   <Textarea
                     name="source_metadata"
-                    defaultValue={
-                      editing?.source_metadata
-                        ? JSON.stringify(editing.source_metadata, null, 2)
-                        : ""
-                    }
+                    defaultValue=""
                     placeholder='{"source":"manual","note":"Imported from a CSV"}'
                     rows={5}
                   />
@@ -436,7 +464,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     <input
                       type="checkbox"
                       name="is_publicly_visitable"
-                      defaultChecked={editing?.is_publicly_visitable ?? true}
+                      defaultChecked
                       className="size-4 accent-slate-950"
                     />
                     Publicly visitable
@@ -446,7 +474,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                     <input
                       type="checkbox"
                       name="is_active"
-                      defaultChecked={editing?.is_active ?? true}
+                      defaultChecked
                       className="size-4 accent-slate-950"
                     />
                     Active in seed pipeline
@@ -454,14 +482,7 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <SubmitButton>
-                    {editing ? "Save place" : "Create place"}
-                  </SubmitButton>
-                  {editing ? (
-                    <Button asChild variant="outline">
-                      <Link href="/dashboard/places">Clear selection</Link>
-                    </Button>
-                  ) : null}
+                  <SubmitButton>Create place</SubmitButton>
                 </div>
               </form>
             </CardContent>

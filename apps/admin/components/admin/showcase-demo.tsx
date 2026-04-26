@@ -403,7 +403,6 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
             </div>
             <div className="space-y-2">
               {[
-                { href: "/dashboard/places/map", label: "Map explorer" },
                 { href: "/dashboard/places/nearby", label: "Bulk nearby generation" },
                 { href: "/dashboard/candidates", label: "Candidate review" },
                 { href: "/dashboard/sponsors", label: "Sponsor ops" },
@@ -461,9 +460,9 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                     </Link>
                   </Button>
                   <Button asChild variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15">
-                    <Link href="/dashboard/places/map">
-                      Open map explorer
-                      <Compass className="size-4" />
+                    <Link href="/dashboard/places/nearby">
+                      Open nearby generator
+                      <Layers3 className="size-4" />
                     </Link>
                   </Button>
                 </div>
@@ -955,10 +954,10 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <PipelineCard
-              chip="Places map"
+              chip="Places workflow"
               icon={<MapPin className="size-4" />}
               title="Search and seed by area"
-              body="The map explorer helps admins find real places, inspect coverage, and add or generate candidates from nearby matches."
+              body="The places workflow helps admins curate stored locations, inspect coverage, and add or generate candidates from nearby matches."
             />
             <PipelineCard
               chip="Nearby generation"
@@ -984,7 +983,6 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {[
                   { href: "/dashboard/places", label: "Places" },
-                  { href: "/dashboard/places/map", label: "Map explorer" },
                   { href: "/dashboard/places/nearby", label: "Nearby generator" },
                   { href: "/dashboard/candidates", label: "Candidates" },
                   { href: "/dashboard/sponsors", label: "Sponsors" },

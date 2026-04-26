@@ -23,6 +23,7 @@ import {
   generateNearbyQuestCandidatesFromSearch,
   importPlaces,
   listQuestCandidates,
+  deletePlace,
   publishQuestCandidate,
   savePlace,
   saveQuestCandidate,
@@ -120,6 +121,10 @@ function generationErrorCode(error: unknown) {
     return "place-generation-failed";
   }
 
+  if (error.message.includes("already has a live quest")) {
+    return "place-already-published";
+  }
+
   if (error.message.includes("valid coordinates")) {
     return "place-needs-coordinates";
   }
@@ -133,6 +138,10 @@ function generationErrorCode(error: unknown) {
   }
 
   return "place-generation-failed";
+}
+
+function generationErrorDetail(error: unknown) {
+  return error instanceof Error ? error.message : "Something unexpected blocked candidate generation.";
 }
 
 function parseImportPayload(value?: string) {
@@ -408,6 +417,7 @@ export async function savePlaceAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/places/nearby");
   redirect("/dashboard/places?status=saved");
 }
 
@@ -475,6 +485,7 @@ export async function importPlacesAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/places/nearby");
   redirect("/dashboard/places?status=imported");
 }
 
@@ -534,10 +545,13 @@ export async function generateQuestCandidateAction(formData: FormData) {
     const candidate = await generateQuestCandidateFromPlace(placeId);
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/places");
+    revalidatePath("/dashboard/places/nearby");
     revalidatePath("/dashboard/candidates");
     redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
   } catch (error) {
-    redirect(`/dashboard/places?error=${generationErrorCode(error)}`);
+    const code = generationErrorCode(error);
+    const detail = encodeURIComponent(generationErrorDetail(error));
+    redirect(`/dashboard/places?error=${code}&detail=${detail}`);
   }
 }
 
@@ -547,7 +561,7 @@ export async function savePlaceFromMapAction(formData: FormData) {
   const parsed = parsePlacePayload(formData);
 
   if (!parsed.success) {
-    redirect("/dashboard/places/map?error=check-form");
+    redirect("/dashboard/places?error=check-form");
   }
 
   try {
@@ -578,16 +592,16 @@ export async function savePlaceFromMapAction(formData: FormData) {
     });
   } catch (error) {
     if (isStateReferenceError(error)) {
-      redirect("/dashboard/places/map?error=state-invalid");
+      redirect("/dashboard/places?error=state-invalid");
     }
 
-    redirect("/dashboard/places/map?error=check-form");
+    redirect("/dashboard/places?error=check-form");
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/places");
-  revalidatePath("/dashboard/places/map");
-  redirect("/dashboard/places/map?status=saved");
+  revalidatePath("/dashboard/places/nearby");
+  redirect("/dashboard/places?status=saved");
 }
 
 export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
@@ -596,7 +610,7 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
   const parsed = parsePlacePayload(formData);
 
   if (!parsed.success) {
-    redirect("/dashboard/places/map?error=check-form");
+    redirect("/dashboard/places?error=check-form");
   }
 
   try {
@@ -627,23 +641,51 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
     });
 
     if (!savedPlace?.id) {
-      redirect("/dashboard/places/map?error=check-form");
+      redirect("/dashboard/places?error=check-form");
     }
 
     const candidate = await generateQuestCandidateFromPlace(savedPlace.id);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/places");
-    revalidatePath("/dashboard/places/map");
     revalidatePath("/dashboard/candidates");
     redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
   } catch (error) {
     if (isStateReferenceError(error)) {
-      redirect("/dashboard/places/map?error=state-invalid");
+      redirect("/dashboard/places?error=state-invalid");
     }
 
-    redirect(`/dashboard/places/map?error=${generationErrorCode(error)}`);
+    const code = generationErrorCode(error);
+    const detail = encodeURIComponent(generationErrorDetail(error));
+    redirect(`/dashboard/places?error=${code}&detail=${detail}`);
   }
+}
+
+export async function deletePlaceAction(formData: FormData) {
+  await requireAdminSession();
+
+  const placeId = readString(formData, "place_id");
+
+  if (!placeId) {
+    redirect("/dashboard/places?error=check-form");
+  }
+
+  try {
+    await deletePlace(placeId);
+  } catch (error) {
+    redirect(
+      `/dashboard/places?error=place-delete-failed&detail=${encodeURIComponent(
+        error instanceof Error ? error.message : "Unable to delete the place.",
+      )}`,
+    );
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/candidates");
+  revalidatePath("/dashboard/quests");
+  revalidatePath("/dashboard/places/nearby");
+  redirect("/dashboard/places?status=deleted");
 }
 
 export async function generateNearbyQuestCandidatesAction(formData: FormData) {

@@ -251,6 +251,13 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
                         </Link>
                       </Button>
 
+                      <Button asChild variant="outline">
+                        <Link href={`/dashboard/places?edit=${candidate.place_id}`}>
+                          <MapPin className="size-4" />
+                          Open source place
+                        </Link>
+                      </Button>
+
                       {candidate.status === "approved" && !candidate.published_quest_id ? (
                         <form action={publishQuestCandidateAction}>
                           <input type="hidden" name="candidate_id" value={candidate.id} />
@@ -373,7 +380,21 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
                       Source place
                     </label>
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      {editing.place.name} · {editing.place.city ?? "Unknown city"}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{editing.place.name}</p>
+                          <p className="mt-1">
+                            {editing.place.city ?? "Unknown city"} ·{" "}
+                            {editing.place.state?.code ?? editing.place.state_code ?? "State unresolved"}
+                          </p>
+                        </div>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/dashboard/places?edit=${editing.place_id}`}>
+                            <MapPin className="size-4" />
+                            Open place
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
