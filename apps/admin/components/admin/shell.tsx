@@ -35,12 +35,6 @@ const navigation = [
     description: "Import and curate real-world points of interest.",
   },
   {
-    href: "/dashboard/places/map",
-    iconKey: "map",
-    label: "Map",
-    description: "Search places visually and seed content from the map.",
-  },
-  {
     href: "/dashboard/candidates",
     iconKey: "candidates",
     label: "Candidates",
@@ -136,7 +130,7 @@ export function AdminShell({ children, user, mode }: AdminShellProps) {
               </p>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-sky-900">
                 <div className="rounded-2xl bg-white/80 px-3 py-2">1. Explore Dashboard and Sponsors</div>
-                <div className="rounded-2xl bg-white/80 px-3 py-2">2. Open Places and Map to seed content</div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">2. Open Places and Nearby generator to seed content</div>
                 <div className="rounded-2xl bg-white/80 px-3 py-2">3. Review Candidates and publish later</div>
               </div>
             </div>

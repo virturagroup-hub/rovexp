@@ -9,7 +9,6 @@ Private internal dashboard for operating quests, sponsors, rewards, titles, badg
 - Tailwind CSS v4
 - shadcn/ui
 - Supabase SSR
-- Google Maps JavaScript API + Places library for the admin map explorer
 
 ## Routes
 
@@ -18,7 +17,6 @@ Private internal dashboard for operating quests, sponsors, rewards, titles, badg
 - `/showcase`
 - `/dashboard/sponsors`
 - `/dashboard/places`
-- `/dashboard/places/map`
 - `/dashboard/places/nearby`
 - `/dashboard/candidates`
 - `/dashboard/quests`
@@ -56,13 +54,8 @@ corepack pnpm --filter @rovexp/admin dev
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for the admin web map explorer and Google Places discovery
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback only)
 - `ADMIN_DEMO_ENABLED` (showcase/demo walkthrough toggle)
-
-The admin map explorer uses the Google Maps JavaScript API for the interactive canvas and the
-Google Places library for autocomplete, place details, and nearby business discovery. It does not
-use Maps Embed, and it does not use mobile-native map SDKs.
 
 ## Auth
 
@@ -97,7 +90,6 @@ The demo walkthrough highlights the major admin surfaces:
 - Showcase Demo
 - Sponsors
 - Places
-- Map explorer
 - Candidates
 - Reviews
 - Users
@@ -122,12 +114,23 @@ The admin dashboard is safe to deploy on a custom domain or the standard Vercel 
 The internal control room now supports a place-to-quest workflow:
 
 1. create or import `places`
-2. open `/dashboard/places/map` to search Google Places, search stored internal places, or add a manual pin
-3. open `/dashboard/places/nearby` to bulk-generate `quest_candidates` from stored nearby places
-4. review and edit the candidate
-5. publish the approved candidate into a live quest
+2. open `/dashboard/places/nearby` to bulk-generate `quest_candidates` from stored nearby places
+3. review and edit the candidate
+4. publish the approved candidate into a live quest
 
 That keeps humans in control while still giving the team a repeatable way to seed nearby content.
 Duplicate places, inactive rows, private venues, and already-published sources are skipped automatically during the nearby bulk generator.
 Nearby matching uses the stored place coordinates plus the admin-entered radius and filters; it is intentionally simple and easy to upgrade later if the place corpus grows.
 Generated candidates now carry structured generation notes so reviewers can see the source place, vibe, title/description pattern, rarity rationale, and XP logic without digging through raw JSON.
+
+## Showcase Demo Access
+
+The intended showcase path is:
+
+1. open `/login`
+2. if `ADMIN_DEMO_ENABLED=true`, click `Open demo walkthrough`
+3. or sign in with a promoted Supabase admin account and open `/showcase`
+
+This demo mode uses the seeded mock admin store and is intentionally non-destructive. It is the safest way to present the admin experience during a deadline run.
+
+For a concise handoff, see [`docs/showcase-demo.md`](../../docs/showcase-demo.md).

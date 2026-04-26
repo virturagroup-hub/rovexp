@@ -83,13 +83,13 @@ export default async function DashboardPage({
                   Open showcase demo
                   <ArrowRight className="size-4" />
                 </Link>
-                <Link
-                  href="/dashboard/places/map"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Open map explorer
-                  <Compass className="size-4" />
-                </Link>
+              <Link
+                href="/dashboard/places"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+              >
+                Open places
+                <Layers3 className="size-4" />
+              </Link>
               </div>
             </div>
 

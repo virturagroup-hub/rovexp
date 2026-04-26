@@ -39,27 +39,27 @@ export default async function MapExplorerPage({
         <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <CardHeader className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge className="bg-sky-100 text-sky-900">Google Maps + Places</Badge>
-              <Badge variant="outline">Live public places</Badge>
+              <Badge className="bg-sky-100 text-sky-900">Internal draft tool</Badge>
+              <Badge variant="outline">Not part of the showcase path</Badge>
             </div>
             <CardTitle className="font-display text-3xl tracking-tight text-slate-950">
-              Find nearby businesses on a real map, save the right spot, and turn it into a quest source
+              Draft a location by hand if you need a one-off internal place record
             </CardTitle>
             <p className="max-w-3xl text-sm leading-7 text-slate-600">
-              Search real nearby businesses through Google Places by location and category, then
-              add the chosen spot into the RoveXP places table. Once a place is stored, you can
-              generate a quest candidate from it through the normal review flow.
+              This route is an internal utility for one-off drafting. The showcase itself does not
+              depend on this screen. Use the main places and nearby generator workflow for the
+              repeatable content pipeline.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             {[
-              {
-                detail: "Search nearby businesses by location and type.",
-                label: "Search",
-                value: "Live",
+                {
+                detail: "Create a one-off place record from a selected location.",
+                label: "Draft",
+                value: "Local",
               },
               {
-                detail: "Save the selected business as a stored place record.",
+                detail: "Save the record into the internal places table.",
                 label: "Store",
                 value: "Place",
               },
