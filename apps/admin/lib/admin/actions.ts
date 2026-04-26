@@ -2,7 +2,7 @@
 
 import {
   badgeFormSchema,
-  nearbyQuestCandidateGenerationSchema,
+  nearbyPlacesSearchSchema,
   placeFormSchema,
   questCandidateFormSchema,
   questFormSchema,
@@ -19,7 +19,7 @@ import { clearDemoSession, requireAdminSession } from "./auth";
 import { enableAdminDemoMode, isAdminDemoEnabled } from "./demo";
 import {
   generateQuestCandidateFromPlace,
-  generateNearbyQuestCandidates,
+  generateNearbyQuestCandidatesFromSearch,
   importPlaces,
   listQuestCandidates,
   publishQuestCandidate,
@@ -49,6 +49,13 @@ function readNumber(formData: FormData, key: string) {
 function readOptionalNumber(formData: FormData, key: string) {
   const value = readString(formData, key);
   return value ? Number(value) : null;
+}
+
+function readStringArray(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .map((value) => value.toString().trim())
+    .filter(Boolean);
 }
 
 function toNullable(value?: string) {
@@ -527,17 +534,20 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
 export async function generateNearbyQuestCandidatesAction(formData: FormData) {
   await requireAdminSession();
 
-  const parsed = nearbyQuestCandidateGenerationSchema.safeParse({
+  const intent = readString(formData, "intent") || "generate_all";
+  const parsed = nearbyPlacesSearchSchema.safeParse({
     active_only: readBoolean(formData, "active_only"),
     area_label: readString(formData, "area_label"),
     city: readString(formData, "city"),
-    latitude: readNumber(formData, "latitude"),
-    longitude: readNumber(formData, "longitude"),
+    latitude: readOptionalNumber(formData, "latitude"),
+    longitude: readOptionalNumber(formData, "longitude"),
     min_rating: readOptionalNumber(formData, "min_rating"),
     min_review_count: readOptionalNumber(formData, "min_review_count"),
     place_types: readString(formData, "place_types"),
     public_only: readBoolean(formData, "public_only"),
-    radius_miles: readNumber(formData, "radius_miles"),
+    radius_miles: readOptionalNumber(formData, "radius_miles"),
+    search_mode: readString(formData, "search_mode") || "coordinates",
+    selected_place_ids: readStringArray(formData, "selected_place_ids"),
     state_id: readString(formData, "state_id"),
   });
 
@@ -545,18 +555,25 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
     redirect("/dashboard/places/nearby?error=check-form");
   }
 
+  if (intent === "generate_selected" && parsed.data.selected_place_ids.length === 0) {
+    redirect("/dashboard/places/nearby?error=select-some-places");
+  }
+
   try {
-    const result = await generateNearbyQuestCandidates({
+    const result = await generateNearbyQuestCandidatesFromSearch({
       active_only: parsed.data.active_only,
-      area_label: toNullable(parsed.data.area_label),
-      city: toNullable(parsed.data.city),
+      area_label: parsed.data.area_label || undefined,
+      city: parsed.data.city || undefined,
       latitude: parsed.data.latitude,
       longitude: parsed.data.longitude,
       min_rating: parsed.data.min_rating ?? null,
       min_review_count: parsed.data.min_review_count ?? null,
       place_types: parsed.data.place_types ?? "",
       public_only: parsed.data.public_only,
-      radius_miles: parsed.data.radius_miles,
+      radius_miles: parsed.data.radius_miles ?? null,
+      search_mode: parsed.data.search_mode,
+      selected_place_ids:
+        intent === "generate_selected" ? parsed.data.selected_place_ids : [],
       state_id: parsed.data.state_id,
     });
 
@@ -565,16 +582,14 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
       active_only: parsed.data.active_only ? "on" : "",
       area_label: parsed.data.area_label ?? "",
       city: parsed.data.city ?? "",
-      latitude: String(parsed.data.latitude),
-      longitude: String(parsed.data.longitude),
+      latitude: parsed.data.latitude === null ? "" : String(parsed.data.latitude),
+      longitude: parsed.data.longitude === null ? "" : String(parsed.data.longitude),
       min_rating: parsed.data.min_rating === null ? "" : String(parsed.data.min_rating),
-      min_review_count:
-        parsed.data.min_review_count === null
-          ? ""
-          : String(parsed.data.min_review_count),
+      min_review_count: parsed.data.min_review_count === null ? "" : String(parsed.data.min_review_count),
       place_types: parsed.data.place_types ?? "",
       public_only: parsed.data.public_only ? "on" : "",
-      radius_miles: String(parsed.data.radius_miles),
+      radius_miles: parsed.data.radius_miles === null ? "" : String(parsed.data.radius_miles),
+      search_mode: parsed.data.search_mode,
       state_id: parsed.data.state_id,
       status: "bulk-generated",
       summary: JSON.stringify(summary),

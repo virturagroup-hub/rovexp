@@ -25,6 +25,7 @@ import type {
   NearbyGenerationPreviewItem,
   NearbyGenerationSummary,
   NearbyQuestCandidatePreview,
+  NearbyPlacesSearchInput,
   QuestCandidateGenerationNotes,
   QuestGenerationVibe,
 } from "@rovexp/types";
@@ -211,6 +212,155 @@ export const nearbyGenerationSkipLabels: Record<NearbyGenerationSkipReason, stri
   type_mismatch: "Does not match place type filter",
   wrong_state: "Different state",
 };
+
+interface NearbySearchResolution {
+  latitude: number;
+  longitude: number;
+  source: "coordinates" | "stored_area";
+  matched_places: number;
+}
+
+function matchesNearbyBaseFilters(
+  place: PlaceWithRelations,
+  filters: {
+    active_only: boolean;
+    area_label: string | null;
+    city: string | null;
+    min_rating: number | null;
+    min_review_count: number | null;
+    place_types: string;
+    public_only: boolean;
+    state_id: string;
+  },
+  selectedState: StateRecord,
+) {
+  const placeStateId = place.state?.id ?? place.state_id ?? null;
+  const placeStateCode = place.state?.code ?? place.state_code ?? null;
+
+  if (!placeStateId && !placeStateCode) {
+    return false;
+  }
+
+  if (
+    (placeStateId && placeStateId !== selectedState.id) ||
+    (placeStateCode && placeStateCode !== selectedState.code)
+  ) {
+    return false;
+  }
+
+  if (filters.active_only && !place.is_active) {
+    return false;
+  }
+
+  if (filters.public_only && !place.is_publicly_visitable) {
+    return false;
+  }
+
+  if (!matchesCityFilter(place, filters.city)) {
+    return false;
+  }
+
+  if (filters.min_rating !== null) {
+    const rating = place.rating ?? 0;
+
+    if (rating < filters.min_rating) {
+      return false;
+    }
+  }
+
+  if (filters.min_review_count !== null) {
+    const reviewCount = place.review_count ?? 0;
+
+    if (reviewCount < filters.min_review_count) {
+      return false;
+    }
+  }
+
+  if (normalizeTokens(filters.place_types).length && !matchesPlaceTypeFilter(place, filters.place_types)) {
+    return false;
+  }
+
+  return true;
+}
+
+function resolveNearbySearchCenter(
+  filters: NearbyPlacesSearchInput,
+  context: NearbyGenerationContext,
+): NearbySearchResolution {
+  const selectedState = context.states.find((state) => state.id === filters.state_id);
+
+  if (!selectedState) {
+    throw new Error("The selected state is not available.");
+  }
+
+  const hasCoordinates =
+    Number.isFinite(filters.latitude ?? NaN) && Number.isFinite(filters.longitude ?? NaN);
+
+  if (
+    (filters.search_mode === "coordinates" || filters.search_mode === "combined") &&
+    hasCoordinates
+  ) {
+    return {
+      latitude: filters.latitude as number,
+      longitude: filters.longitude as number,
+      matched_places: context.places.length,
+      source: "coordinates",
+    };
+  }
+
+  const areaMatches = context.places.filter((place) =>
+    matchesNearbyBaseFilters(
+      place,
+      {
+        active_only: filters.active_only,
+        area_label: filters.area_label ?? null,
+        city: filters.city ?? null,
+        min_rating: filters.min_rating ?? null,
+        min_review_count: filters.min_review_count ?? null,
+        place_types: filters.place_types ?? "",
+        public_only: filters.public_only,
+        state_id: filters.state_id,
+      },
+      selectedState,
+    ),
+  );
+
+  const labeledMatches = areaMatches.filter((place) =>
+    matchesAreaLabel(place, filters.area_label ?? null),
+  );
+
+  const scopedMatches = labeledMatches.filter(
+    (place) =>
+      Number.isFinite(place.latitude) &&
+      Number.isFinite(place.longitude) &&
+      !(place.latitude === 0 && place.longitude === 0),
+  );
+
+  if (!scopedMatches.length) {
+    throw new Error(
+      "No stored places matched that area. Add coordinates or widen the state/city filters.",
+    );
+  }
+
+  const totals = scopedMatches.reduce(
+    (accumulator, place) => {
+      accumulator.latitude += place.latitude;
+      accumulator.longitude += place.longitude;
+      return accumulator;
+    },
+    {
+      latitude: 0,
+      longitude: 0,
+    },
+  );
+
+  return {
+    latitude: totals.latitude / scopedMatches.length,
+    longitude: totals.longitude / scopedMatches.length,
+    matched_places: scopedMatches.length,
+    source: "stored_area",
+  };
+}
 
 function normalizeTokens(value: string | null | undefined) {
   return (value ?? "")
@@ -821,6 +971,19 @@ function matchesCityFilter(place: PlaceWithRelations, city: string | null) {
   return normalize(haystack).includes(normalized);
 }
 
+function matchesAreaLabel(place: PlaceWithRelations, areaLabel: string | null) {
+  if (!areaLabel) {
+    return true;
+  }
+
+  const normalized = normalize(areaLabel);
+  const haystack = [place.city, place.name, place.address, place.place_type]
+    .filter(Boolean)
+    .join(" ");
+
+  return normalize(haystack).includes(normalized);
+}
+
 function matchesPlaceTypeFilter(place: PlaceWithRelations, placeTypes: string) {
   const tokens = normalizeTokens(placeTypes);
 
@@ -1380,6 +1543,28 @@ export async function previewNearbyQuestCandidateGeneration(
   return buildNearbyGenerationPlan(filters, context);
 }
 
+export async function previewNearbyQuestCandidateGenerationFromSearch(
+  filters: NearbyPlacesSearchInput,
+) {
+  const context = await loadNearbyGenerationContext();
+  const resolved = resolveNearbySearchCenter(filters, context);
+  const searchFilters: NearbyGenerationFilters = {
+    active_only: filters.active_only,
+    area_label: filters.area_label ?? null,
+    city: filters.city ?? null,
+    latitude: resolved.latitude,
+    longitude: resolved.longitude,
+    min_rating: filters.min_rating ?? null,
+    min_review_count: filters.min_review_count ?? null,
+    place_types: filters.place_types ?? "",
+    public_only: filters.public_only,
+    radius_miles: filters.radius_miles ?? 10,
+    state_id: filters.state_id,
+  };
+
+  return buildNearbyGenerationPlan(searchFilters, context);
+}
+
 export async function generateNearbyQuestCandidates(filters: NearbyGenerationFilters) {
   const context = await loadNearbyGenerationContext();
   const preview = buildNearbyGenerationPlan(filters, context);
@@ -1426,6 +1611,76 @@ export async function generateNearbyQuestCandidates(filters: NearbyGenerationFil
       ),
       ...skippedReasons,
     } as Partial<Record<NearbyGenerationSkipReason, number>>,
+    created_candidates.length,
+  );
+
+  return {
+    ...summary,
+    created_candidates,
+  };
+}
+
+export async function generateNearbyQuestCandidatesFromSearch(
+  filters: NearbyPlacesSearchInput,
+) {
+  const context = await loadNearbyGenerationContext();
+  const resolved = resolveNearbySearchCenter(filters, context);
+  const searchFilters: NearbyGenerationFilters = {
+    active_only: filters.active_only,
+    area_label: filters.area_label ?? null,
+    city: filters.city ?? null,
+    latitude: resolved.latitude,
+    longitude: resolved.longitude,
+    min_rating: filters.min_rating ?? null,
+    min_review_count: filters.min_review_count ?? null,
+    place_types: filters.place_types ?? "",
+    public_only: filters.public_only,
+    radius_miles: filters.radius_miles ?? 10,
+    state_id: filters.state_id,
+  };
+
+  const preview = buildNearbyGenerationPlan(searchFilters, context);
+  const selectedIds = new Set(filters.selected_place_ids ?? []);
+  const placesToGenerate =
+    selectedIds.size > 0
+      ? preview.matches.filter((match) => selectedIds.has(match.place.id))
+      : preview.matches;
+  const selectedState = context.states.find((state) => state.id === filters.state_id);
+
+  if (!selectedState) {
+    throw new Error("The selected state is not available.");
+  }
+
+  const created_candidates: QuestCandidateWithRelations[] = [];
+  const skippedReasons: Partial<Record<NearbyGenerationSkipReason, number>> = Object.fromEntries(
+    preview.skipped_breakdown.map((item) => [item.reason, item.count]),
+  ) as Partial<Record<NearbyGenerationSkipReason, number>>;
+
+  for (const match of placesToGenerate) {
+    try {
+      const candidate = await generateQuestCandidateFromPlaceRecord(
+        match.place,
+        context,
+        buildNearbyGenerationNotes(searchFilters, selectedState),
+      );
+      created_candidates.push(candidate);
+    } catch (error) {
+      if (isDuplicateCandidateInsertError(error)) {
+        skippedReasons.existing_candidate =
+          (skippedReasons.existing_candidate ?? 0) + 1;
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  const summary = buildNearbySummary(
+    searchFilters,
+    selectedState,
+    context.places.length,
+    preview.matches,
+    skippedReasons,
     created_candidates.length,
   );
 

@@ -9,13 +9,25 @@ import { cn } from "@/lib/utils";
 interface SubmitButtonProps {
   children: React.ReactNode;
   className?: string;
+  name?: string;
+  value?: string;
+  variant?: React.ComponentProps<typeof Button>["variant"];
 }
 
-export function SubmitButton({ children, className }: SubmitButtonProps) {
+export function SubmitButton({
+  children,
+  className,
+  name,
+  value,
+  variant = "default",
+}: SubmitButtonProps) {
   const { pending } = useFormStatus();
 
   return (
     <Button
+      name={name}
+      value={value}
+      variant={variant}
       type="submit"
       className={cn("w-full sm:w-auto", className)}
       disabled={pending}

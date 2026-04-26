@@ -200,6 +200,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
   const place = demoPlaces[0]!;
   const generatedCandidate = demoQuestCandidates[0]!;
   const publishCandidate = demoQuestCandidates[3]!;
+  const scrollOffset = 96;
 
   const scrollToSection = (index: number) => {
     const step = steps[index];
@@ -211,7 +212,12 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
     const node = document.getElementById(step.id);
 
     if (node) {
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      const top = window.scrollY + node.getBoundingClientRect().top - scrollOffset;
+
+      window.scrollTo({
+        behavior: "smooth",
+        top: Math.max(top, 0),
+      });
     }
 
     setActiveStep(index);
@@ -271,6 +277,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
             key={step.id}
             type="button"
             onClick={() => scrollToSection(index)}
+            aria-current={active ? "step" : undefined}
             className={cn(
               "flex w-full items-start gap-3 rounded-[1.35rem] border px-4 py-3 text-left transition",
               active
@@ -305,7 +312,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+      <aside className="space-y-4 xl:sticky xl:top-8 xl:max-h-[calc(100vh-4rem)] xl:self-start xl:overflow-y-auto xl:pr-1">
         <Card className="rounded-[2rem] border-slate-200/80 bg-white/88 shadow-[0_18px_52px_rgba(15,23,42,0.08)] backdrop-blur">
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
@@ -363,6 +370,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
             <div className="flex gap-2 pt-1">
               <Button
                 className="flex-1"
+                disabled={activeStep === 0}
                 onClick={() => scrollToSection(Math.max(activeStep - 1, 0))}
                 variant="outline"
               >
@@ -371,6 +379,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
               </Button>
               <Button
                 className="flex-1"
+                disabled={activeStep === steps.length - 1}
                 onClick={() =>
                   scrollToSection(Math.min(activeStep + 1, steps.length - 1))
                 }

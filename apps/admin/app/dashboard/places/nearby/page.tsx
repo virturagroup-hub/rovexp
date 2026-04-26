@@ -2,23 +2,25 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 
 import { StatusBanner } from "@/components/admin/status-banner";
+import { NearbyPlacesSearchControls } from "@/components/admin/nearby-places-search-controls";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { generateNearbyQuestCandidatesAction } from "@/lib/admin/actions";
 import {
   listPlaces,
   listQuestCandidates,
+  listQuests,
   listStates,
+  previewNearbyQuestCandidateGenerationFromSearch,
   previewNearbyQuestCandidateGeneration,
   nearbyGenerationSkipLabels,
 } from "@/lib/admin/repository";
 import type {
   NearbyGenerationSummary,
   NearbyQuestCandidatePreview,
+  NearbyPlacesSearchMode,
 } from "@rovexp/types";
 
 interface NearbyPlacesPageProps {
@@ -34,6 +36,7 @@ interface NearbyPlacesPageProps {
     place_types?: string;
     public_only?: string;
     radius_miles?: string;
+    search_mode?: string;
     state_id?: string;
     status?: string;
     summary?: string;
@@ -60,6 +63,16 @@ function readBooleanParam(value?: string | string[]) {
   return next === "on" || next === "true" || next === "1";
 }
 
+function readSearchModeParam(value?: string | string[]) {
+  const next = readParam(value);
+
+  if (next === "coordinates" || next === "combined" || next === "stored_area") {
+    return next;
+  }
+
+  return null;
+}
+
 function parseSummary(value?: string | string[]) {
   const raw = readParam(value);
 
@@ -75,30 +88,39 @@ function parseSummary(value?: string | string[]) {
 }
 
 function hasPreviewFilters(params: Awaited<NearbyPlacesPageProps["searchParams"]>) {
-  return Boolean(
-    readParam(params.state_id) &&
-      readParam(params.latitude) &&
-      readParam(params.longitude) &&
-      readParam(params.radius_miles),
-  );
+  const searchMode = readSearchModeParam(params.search_mode);
+
+  if (!readParam(params.state_id)) {
+    return false;
+  }
+
+  if (searchMode) {
+    return true;
+  }
+
+  return Boolean(readParam(params.latitude) && readParam(params.longitude));
 }
 
 export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPageProps) {
   const params = await searchParams;
-  const [states, places, candidates] = await Promise.all([
+  const [states, places, candidates, quests] = await Promise.all([
     listStates(),
     listPlaces(),
     listQuestCandidates(),
+    listQuests(),
   ]);
 
-  const latitude = Number(readParam(params.latitude));
-  const longitude = Number(readParam(params.longitude));
-  const radiusMiles = Number(readParam(params.radius_miles));
+  const searchMode = readSearchModeParam(params.search_mode);
+  const latitude = readNumberParam(params.latitude);
+  const longitude = readNumberParam(params.longitude);
+  const radiusMiles = readNumberParam(params.radius_miles);
+  const fallbackSearchMode: NearbyPlacesSearchMode =
+    Number.isFinite(latitude ?? NaN) && Number.isFinite(longitude ?? NaN)
+      ? "coordinates"
+      : "stored_area";
+  const resolvedSearchMode: NearbyPlacesSearchMode = searchMode ?? fallbackSearchMode;
   const previewFilters =
-    hasPreviewFilters(params) &&
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude) &&
-    Number.isFinite(radiusMiles)
+    hasPreviewFilters(params) && readParam(params.state_id)
       ? {
           active_only: readBooleanParam(params.active_only),
           area_label: readParam(params.area_label),
@@ -110,19 +132,65 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
           place_types: readParam(params.place_types),
           public_only: readBooleanParam(params.public_only),
           radius_miles: radiusMiles,
+          search_mode: resolvedSearchMode,
+          selected_place_ids: [],
           state_id: readParam(params.state_id),
         }
       : null;
 
-  const preview: NearbyQuestCandidatePreview | null = previewFilters
-    ? await previewNearbyQuestCandidateGeneration(previewFilters)
-    : null;
+  let preview: NearbyQuestCandidatePreview | null = null;
+  let previewError: string | null = null;
+
+  if (previewFilters) {
+    try {
+      if (searchMode) {
+        preview = await previewNearbyQuestCandidateGenerationFromSearch(previewFilters);
+      } else if (
+        Number.isFinite(latitude ?? NaN) &&
+        Number.isFinite(longitude ?? NaN) &&
+        Number.isFinite(radiusMiles ?? NaN)
+      ) {
+        preview = await previewNearbyQuestCandidateGeneration({
+          active_only: previewFilters.active_only,
+          area_label: previewFilters.area_label,
+          city: previewFilters.city,
+          latitude: latitude as number,
+          longitude: longitude as number,
+          min_rating: previewFilters.min_rating,
+          min_review_count: previewFilters.min_review_count,
+          place_types: previewFilters.place_types,
+          public_only: previewFilters.public_only,
+          radius_miles: radiusMiles as number,
+          state_id: previewFilters.state_id,
+        });
+      }
+    } catch (error) {
+      previewError = error instanceof Error ? error.message : "Unable to preview nearby places.";
+    }
+  }
 
   const generatedSummary = parseSummary(params.summary);
   const selectedState = states.find((state) => state.id === readParam(params.state_id)) ?? null;
   const totalKnownPlaces = places.length;
   const candidateCount = candidates.length;
+  const questCount = quests.length;
   const renderSummary = generatedSummary ?? preview;
+  const searchControlsKey = [
+    params.search_mode,
+    params.state_id,
+    params.area_label,
+    params.city,
+    params.latitude,
+    params.longitude,
+    params.radius_miles,
+    params.place_types,
+    params.min_rating,
+    params.min_review_count,
+    params.active_only,
+    params.public_only,
+  ]
+    .map((value) => readParam(value))
+    .join("|");
 
   return (
     <div className="space-y-6">
@@ -173,8 +241,8 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
               {[
                 { label: "Known places", value: totalKnownPlaces },
                 { label: "Quest candidates", value: candidateCount },
+                { label: "Live quests", value: questCount },
                 { label: "Preview matches", value: preview?.matched_count ?? 0 },
-                { label: "Generated today", value: generatedSummary?.created_count ?? 0 },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -243,6 +311,12 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Filters</p>
                   <p className="text-slate-300">
+                    Search mode: {resolvedSearchMode}{" "}
+                    {resolvedSearchMode === "stored_area"
+                      ? "(center derived from stored places)"
+                      : ""}
+                  </p>
+                  <p className="text-slate-300">
                     Radius {renderSummary.radius_miles} miles around {renderSummary.latitude.toFixed(3)},{" "}
                     {renderSummary.longitude.toFixed(3)}
                   </p>
@@ -252,9 +326,15 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                   {renderSummary.city ? <p className="text-slate-300">City filter: {renderSummary.city}</p> : null}
                 </div>
               </div>
+            ) : previewError ? (
+              <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-4 text-rose-950">
+                <p className="text-xs uppercase tracking-[0.24em] text-rose-700">Preview error</p>
+                <p className="mt-2 text-sm leading-7">{previewError}</p>
+              </div>
             ) : (
               <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-slate-300">
-                Fill out the form on the left, preview the matching places, then run the bulk generator.
+                Use the search panel below to preview matching places. Search mode changes which
+                fields are required.
               </div>
             )}
 
@@ -273,195 +353,40 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_0.88fr]">
-        <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-          <CardHeader className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-              Nearby generation filters
-            </p>
-            <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-              Preview the area before bulk-generating drafts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action="/dashboard/places/nearby" method="get" className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">State</label>
-                  <select
-                    defaultValue={readParam(params.state_id)}
-                    name="state_id"
-                    className="flex h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm shadow-xs"
-                    required
-                  >
-                    <option value="">Select state</option>
-                    {states.map((state) => (
-                      <option key={state.id} value={state.id}>
-                        {state.code} · {state.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Area label</label>
-                  <Input
-                    defaultValue={readParam(params.area_label)}
-                    name="area_label"
-                    placeholder="Lafayette downtown, Riverfront, campus district..."
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">City filter</label>
-                <Input
-                  defaultValue={readParam(params.city)}
-                  name="city"
-                  placeholder="Optional city or neighborhood name"
-                />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Latitude</label>
-                  <Input
-                    defaultValue={readParam(params.latitude)}
-                    name="latitude"
-                    required
-                    step="0.000001"
-                    type="number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Longitude</label>
-                  <Input
-                    defaultValue={readParam(params.longitude)}
-                    name="longitude"
-                    required
-                    step="0.000001"
-                    type="number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Radius (miles)</label>
-                  <Input
-                    defaultValue={readParam(params.radius_miles) || "10"}
-                    min="1"
-                    name="radius_miles"
-                    required
-                    step="1"
-                    type="number"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
-                  Place type keywords
-                </label>
-                <Textarea
-                  defaultValue={readParam(params.place_types)}
-                  name="place_types"
-                  placeholder="cafe, park, museum, landmark, bookstore, mural"
-                  rows={3}
-                />
-                <p className="text-xs leading-6 text-slate-500">
-                  Separate keywords with commas or line breaks. The generator matches against the stored
-                  place type, name, and description.
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Minimum rating
-                  </label>
-                  <Input
-                    defaultValue={readParam(params.min_rating)}
-                    max="5"
-                    min="0"
-                    name="min_rating"
-                    placeholder="Optional"
-                    step="0.1"
-                    type="number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Minimum review count
-                  </label>
-                  <Input
-                    defaultValue={readParam(params.min_review_count)}
-                    min="0"
-                    name="min_review_count"
-                    placeholder="Optional"
-                    step="1"
-                    type="number"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                  <input
-                    defaultChecked={
-                      typeof params.active_only !== "undefined"
-                        ? readBooleanParam(params.active_only)
-                        : true
-                    }
-                    name="active_only"
-                    type="checkbox"
-                    className="size-4 accent-slate-950"
-                  />
-                  Active places only
-                </label>
-
-                <label className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                  <input
-                    defaultChecked={
-                      typeof params.public_only !== "undefined"
-                        ? readBooleanParam(params.public_only)
-                        : true
-                    }
-                    name="public_only"
-                    type="checkbox"
-                    className="size-4 accent-slate-950"
-                  />
-                  Publicly visitable only
-                </label>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button type="submit" className="bg-slate-950 text-white hover:bg-slate-800">
-                  <Sparkles className="size-4" />
-                  Preview nearby places
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/places/nearby">Reset filters</Link>
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <NearbyPlacesSearchControls
+          key={searchControlsKey}
+          hasPreview={Boolean(renderSummary)}
+          resultAnchorId="nearby-results"
+          states={states}
+        />
 
         <div className="space-y-6">
-          <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+          <Card
+            id="nearby-results"
+            className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+          >
             <CardHeader className="space-y-2">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                Bulk generation
+                Preview results and generation
               </p>
               <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-                Run the bulk workflow with the current preview filters
+                Visible matches, skipped reasons, and draft generation in one place
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-7 text-slate-600">
-                The generator will create draft quest candidates only. It skips places that are already
-                represented by a candidate or a live quest, so you can safely re-run a batch after
-                adjusting the inputs.
+                The generator will create draft quest candidates only. It skips places that are
+                already represented by a candidate or a live quest, so you can safely re-run a batch
+                after adjusting the inputs.
               </p>
 
-              {preview ? (
-                <form action={generateNearbyQuestCandidatesAction} className="space-y-0">
+              {previewError ? (
+                <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-4 text-rose-950">
+                  <p className="text-xs uppercase tracking-[0.24em] text-rose-700">Preview error</p>
+                  <p className="mt-2 text-sm leading-7">{previewError}</p>
+                </div>
+              ) : preview ? (
+                <form action={generateNearbyQuestCandidatesAction} className="space-y-4">
                   <input type="hidden" name="state_id" value={readParam(params.state_id)} />
                   <input type="hidden" name="area_label" value={readParam(params.area_label)} />
                   <input type="hidden" name="city" value={readParam(params.city)} />
@@ -471,6 +396,7 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                   <input type="hidden" name="place_types" value={readParam(params.place_types)} />
                   <input type="hidden" name="min_rating" value={readParam(params.min_rating)} />
                   <input type="hidden" name="min_review_count" value={readParam(params.min_review_count)} />
+                  <input type="hidden" name="search_mode" value={searchMode ?? "stored_area"} />
                   <input
                     type="hidden"
                     name="active_only"
@@ -481,37 +407,23 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                     name="public_only"
                     value={readBooleanParam(params.public_only) ? "on" : ""}
                   />
-                  <SubmitButton>
-                    <CheckCircle2 className="size-4" />
-                    Generate nearby candidates
-                  </SubmitButton>
-                </form>
-              ) : (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm leading-7 text-slate-600">
-                  Run a preview first to enable the bulk generate button with the same filters.
-                </div>
-              )}
 
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm leading-7 text-slate-600">
-                If the batch looks off, adjust the map pin or the place-type keywords, preview again,
-                and re-run the generator. The existing candidate review queue remains the final gate
-                before a quest goes live.
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex flex-wrap gap-3">
+                    <SubmitButton name="intent" value="generate_all">
+                      <CheckCircle2 className="size-4" />
+                      Generate all matched places
+                    </SubmitButton>
+                    <SubmitButton
+                      name="intent"
+                      value="generate_selected"
+                      variant="outline"
+                      className="border-slate-200"
+                    >
+                      <Sparkles className="size-4" />
+                      Generate selected places
+                    </SubmitButton>
+                  </div>
 
-          <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <CardHeader className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                Preview results
-              </p>
-              <CardTitle className="font-display text-2xl tracking-tight text-slate-950">
-                {preview ? `${preview.matches.length} places ready for draft generation` : "No preview yet"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {preview ? (
-                <>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {preview.skipped_breakdown.length > 0
                       ? preview.skipped_breakdown.map((item) => (
@@ -522,7 +434,9 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                             <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                               {nearbyGenerationSkipLabels[item.reason]}
                             </p>
-                            <p className="mt-2 font-display text-2xl text-slate-950">{item.count}</p>
+                            <p className="mt-2 font-display text-2xl text-slate-950">
+                              {item.count}
+                            </p>
                           </div>
                         ))
                       : [
@@ -538,7 +452,9 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                             <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                               {item.label}
                             </p>
-                            <p className="mt-2 font-display text-2xl text-slate-950">{item.count}</p>
+                            <p className="mt-2 font-display text-2xl text-slate-950">
+                              {item.count}
+                            </p>
                           </div>
                         ))}
                   </div>
@@ -574,14 +490,19 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                   ) : null}
 
                   <div className="space-y-3">
-                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                      Matching places
-                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                        Matching places
+                      </p>
+                      <Badge variant="outline">
+                        {preview.matches.length} eligible
+                      </Badge>
+                    </div>
                     <div className="space-y-3">
-                      {preview.matches.slice(0, 8).map((item) => (
-                        <div
+                      {preview.matches.map((item) => (
+                        <label
                           key={item.place.id}
-                          className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+                          className="block rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:border-sky-200"
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="space-y-2">
@@ -592,25 +513,37 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                                     {item.place.state.code} · {item.place.state.name}
                                   </Badge>
                                 ) : null}
+                                <Badge className="bg-sky-100 text-sky-900">
+                                  Imported place
+                                </Badge>
                               </div>
                               <div>
                                 <p className="font-display text-lg font-semibold text-slate-950">
                                   {item.place.name}
                                 </p>
                                 <p className="mt-1 text-sm text-slate-600">
-                                  {item.place.city ?? "Unknown city"} · {item.place.rating?.toFixed(1) ?? "No rating"} ·{" "}
+                                  {item.place.city ?? "Unknown city"} ·{" "}
+                                  {item.place.rating?.toFixed(1) ?? "No rating"} ·{" "}
                                   {item.place.review_count ?? 0} reviews
                                 </p>
                               </div>
                             </div>
 
-                            <div className="rounded-2xl bg-sky-50 px-3 py-2 text-right">
-                              <p className="text-[11px] uppercase tracking-[0.24em] text-sky-700">
-                                Distance
-                              </p>
-                              <p className="font-display text-lg font-semibold text-sky-950">
-                                {item.distance_miles.toFixed(1)} mi
-                              </p>
+                            <div className="flex items-center gap-3">
+                              <div className="rounded-2xl bg-sky-50 px-3 py-2 text-right">
+                                <p className="text-[11px] uppercase tracking-[0.24em] text-sky-700">
+                                  Distance
+                                </p>
+                                <p className="font-display text-lg font-semibold text-sky-950">
+                                  {item.distance_miles.toFixed(1)} mi
+                                </p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                name="selected_place_ids"
+                                value={item.place.id}
+                                className="size-5 rounded border-slate-300 text-slate-950 accent-slate-950"
+                              />
                             </div>
                           </div>
 
@@ -622,24 +555,27 @@ export default async function NearbyPlacesPage({ searchParams }: NearbyPlacesPag
                               {item.place.is_active ? "Active" : "Inactive"}
                             </span>
                           </div>
-                        </div>
+                        </label>
                       ))}
                     </div>
 
-                    {preview.matches.length > 8 ? (
-                      <p className="text-sm text-slate-500">
-                        Showing the first 8 matches. The bulk generator will include the full set.
-                      </p>
-                    ) : null}
                   </div>
-                </>
+                </form>
               ) : (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-7 text-slate-500">
-                  Enter a state, point, radius, and optional filters to preview nearby places.
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm leading-7 text-slate-600">
+                  Run a preview first to see matched places and enable bulk generation with the same
+                  filters.
                 </div>
               )}
+
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm leading-7 text-slate-600">
+                If the batch looks off, adjust the map pin or the place-type keywords, preview again,
+                and re-run the generator. The existing candidate review queue remains the final gate
+                before a quest goes live.
+              </div>
             </CardContent>
           </Card>
+
         </div>
       </div>
     </div>

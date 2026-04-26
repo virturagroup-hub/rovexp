@@ -87,6 +87,28 @@ export const nearbyQuestCandidateGenerationSchema = z.object({
   public_only: z.boolean(),
 });
 
+export const nearbyPlacesSearchModeSchema = z.enum([
+  "combined",
+  "coordinates",
+  "stored_area",
+]);
+
+export const nearbyPlacesSearchSchema = z.object({
+  active_only: z.boolean(),
+  area_label: z.string().max(120).optional().or(z.literal("")),
+  city: z.string().max(120).optional().or(z.literal("")),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  min_rating: z.number().min(0).max(5).optional().nullable(),
+  min_review_count: z.number().int().min(0).optional().nullable(),
+  place_types: z.string().max(400).optional().or(z.literal("")),
+  public_only: z.boolean(),
+  radius_miles: z.number().int().min(1).max(100).optional().nullable(),
+  search_mode: nearbyPlacesSearchModeSchema,
+  selected_place_ids: z.array(z.string()).default([]),
+  state_id: z.string().min(1),
+});
+
 export const questFormSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(3).max(120),
@@ -180,6 +202,8 @@ export type QuestCandidateFormInput = z.infer<typeof questCandidateFormSchema>;
 export type NearbyQuestCandidateGenerationInput = z.infer<
   typeof nearbyQuestCandidateGenerationSchema
 >;
+export type NearbyPlacesSearchInput = z.infer<typeof nearbyPlacesSearchSchema>;
+export type NearbyPlacesSearchMode = z.infer<typeof nearbyPlacesSearchModeSchema>;
 export type QuestFormInput = z.infer<typeof questFormSchema>;
 export type RewardFormInput = z.infer<typeof rewardFormSchema>;
 export type TitleFormInput = z.infer<typeof titleFormSchema>;
