@@ -14,6 +14,7 @@ Private internal dashboard for operating quests, sponsors, rewards, titles, badg
 
 - `/login`
 - `/dashboard`
+- `/showcase`
 - `/dashboard/sponsors`
 - `/dashboard/places`
 - `/dashboard/places/map`
@@ -77,6 +78,8 @@ on conflict (user_id) do update set role = excluded.role;
 
 If `ADMIN_DEMO_ENABLED=true`, the `/login` page shows a clearly labeled demo walkthrough entry path.
 That path uses the seeded mock admin store and is meant for showcase exploration only.
+The dashboard also exposes a persistent `/showcase` route that opens the same guided demo
+inside the admin deployment after sign-in.
 
 - live auth still works normally
 - demo mode is only entered when the user explicitly chooses it
@@ -85,6 +88,7 @@ That path uses the seeded mock admin store and is meant for showcase exploration
 The demo walkthrough highlights the major admin surfaces:
 
 - Dashboard
+- Showcase Demo
 - Sponsors
 - Places
 - Map explorer

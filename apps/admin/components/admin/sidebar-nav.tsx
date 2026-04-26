@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 export type SidebarNavIconKey =
   | "dashboard"
+  | "showcase"
   | "places"
   | "map"
   | "candidates"
@@ -45,6 +46,7 @@ interface SidebarNavProps {
 const iconMap: Record<SidebarNavIconKey, React.ComponentType<{ className?: string }>> = {
   badges: BadgeCheck,
   dashboard: LayoutDashboard,
+  showcase: Sparkles,
   candidates: Layers3,
   places: MapPin,
   map: Map,

@@ -17,6 +17,12 @@ const navigation = [
     description: "Pulse check on quests, sponsors, and catalog health.",
   },
   {
+    href: "/showcase",
+    iconKey: "showcase",
+    label: "Showcase Demo",
+    description: "Guided tour of the user experience and content pipeline.",
+  },
+  {
     href: "/dashboard/sponsors",
     iconKey: "sponsors",
     label: "Sponsors",

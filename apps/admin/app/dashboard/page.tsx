@@ -58,6 +58,69 @@ export default async function DashboardPage({
     <div className="space-y-6">
       <StatusBanner code={params.error ?? params.status} />
 
+      <section>
+        <Card className="overflow-hidden rounded-[2rem] border-sky-200/60 bg-[linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(15,118,110,0.92)_52%,_rgba(245,184,46,0.88))] text-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+          <CardContent className="grid gap-6 p-7 lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/85">
+                <Sparkles className="size-3.5" />
+                Guided showcase
+              </div>
+              <div className="space-y-3">
+                <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
+                  Open the web demo judges can use to understand the product in minutes.
+                </h2>
+                <p className="max-w-2xl text-sm leading-7 text-white/82">
+                  This route stays inside the admin site and walks through the mobile experience,
+                  the places pipeline, nearby candidate generation, and the review-publish loop.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/showcase"
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                >
+                  Open showcase demo
+                  <ArrowRight className="size-4" />
+                </Link>
+                <Link
+                  href="/dashboard/places/map"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Open map explorer
+                  <Compass className="size-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-3 rounded-[1.75rem] border border-white/10 bg-white/8 p-4 backdrop-blur">
+              {[
+                {
+                  title: "User story",
+                  body: "Sponsored spotlight, nearby quests, leaderboard identity, and privacy-aware profiles.",
+                },
+                {
+                  title: "Content ops",
+                  body: "Places import, nearby generation, candidate review, sponsor management, and moderation.",
+                },
+                {
+                  title: "Mobile first",
+                  body: "The live consumer app remains Expo + React Native; this web demo is the guided companion.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-3xl border border-white/10 bg-slate-950/35 px-4 py-4"
+                >
+                  <p className="font-display text-base font-semibold">{item.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-white/75">{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <CardContent className="space-y-6 p-7">
