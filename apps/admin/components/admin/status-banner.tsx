@@ -87,6 +87,30 @@ const banners = {
     body: "Sponsored quests need an associated sponsor business before they can be saved.",
     tone: "warning",
   },
+  "place-needs-coordinates": {
+    icon: AlertCircle,
+    title: "Coordinates are required",
+    body: "This place needs a valid latitude and longitude before a candidate can be generated.",
+    tone: "warning",
+  },
+  "place-not-eligible": {
+    icon: AlertCircle,
+    title: "Place is not eligible yet",
+    body: "Only active, publicly visitable places can be turned into quest candidates.",
+    tone: "warning",
+  },
+  "candidate-duplicate": {
+    icon: CheckCircle2,
+    title: "Candidate already exists",
+    body: "This place already has a candidate. Open the existing draft instead of generating another one.",
+    tone: "info",
+  },
+  "place-generation-failed": {
+    icon: AlertCircle,
+    title: "Candidate generation failed",
+    body: "Something unexpected blocked the place from becoming a candidate. Check the place details and try again.",
+    tone: "warning",
+  },
   "signed-out": {
     icon: CheckCircle2,
     title: "Signed out",

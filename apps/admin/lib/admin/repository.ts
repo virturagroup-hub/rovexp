@@ -1518,6 +1518,17 @@ async function generateQuestCandidateFromPlaceRecord(
     .single();
 
   if (error) {
+    if (isDuplicateCandidateInsertError(error)) {
+      const existingCandidate =
+        context.candidates.find((candidate) => candidate.place_id === place.id) ??
+        (await listQuestCandidates()).find((candidate) => candidate.place_id === place.id);
+
+      if (existingCandidate) {
+        context.candidates = [existingCandidate, ...context.candidates.filter((candidate) => candidate.id !== existingCandidate.id)];
+        return existingCandidate;
+      }
+    }
+
     throw new Error(error.message);
   }
 

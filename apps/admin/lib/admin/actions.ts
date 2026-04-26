@@ -115,6 +115,26 @@ function isStateReferenceError(error: unknown) {
   return error instanceof Error && error.message.startsWith("State ");
 }
 
+function generationErrorCode(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "place-generation-failed";
+  }
+
+  if (error.message.includes("valid coordinates")) {
+    return "place-needs-coordinates";
+  }
+
+  if (error.message.includes("active public places")) {
+    return "place-not-eligible";
+  }
+
+  if (error.message.includes("duplicate key value") || error.message.includes("unique constraint")) {
+    return "candidate-duplicate";
+  }
+
+  return "place-generation-failed";
+}
+
 function parseImportPayload(value?: string) {
   if (!value) {
     return [];
@@ -516,8 +536,8 @@ export async function generateQuestCandidateAction(formData: FormData) {
     revalidatePath("/dashboard/places");
     revalidatePath("/dashboard/candidates");
     redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
-  } catch {
-    redirect("/dashboard/places?error=check-form");
+  } catch (error) {
+    redirect(`/dashboard/places?error=${generationErrorCode(error)}`);
   }
 }
 
@@ -622,7 +642,7 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
       redirect("/dashboard/places/map?error=state-invalid");
     }
 
-    redirect("/dashboard/places/map?error=check-form");
+    redirect(`/dashboard/places/map?error=${generationErrorCode(error)}`);
   }
 }
 
