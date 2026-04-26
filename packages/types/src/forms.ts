@@ -109,6 +109,45 @@ export const nearbyPlacesSearchSchema = z.object({
   state_id: z.string().min(1),
 });
 
+export const nearbyBusinessTypeValues = [
+  "coffee",
+  "food",
+  "parks",
+  "culture",
+  "landmarks",
+  "shopping",
+  "entertainment",
+] as const;
+
+export const nearbyBusinessTypeSchema = z.enum(nearbyBusinessTypeValues);
+
+export const nearbyBusinessSearchSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional().nullable(),
+    location: z.string().max(160).optional().or(z.literal("")),
+    longitude: z.number().min(-180).max(180).optional().nullable(),
+    radius_miles: z.number().int().min(1).max(25),
+    state_code: z.string().max(4),
+    state_id: z.string().min(1),
+    state_name: z.string().max(120),
+    types: z.array(nearbyBusinessTypeSchema).default([]),
+  })
+  .superRefine((value, ctx) => {
+    const hasCoordinates =
+      value.latitude !== null &&
+      value.longitude !== null &&
+      typeof value.latitude === "number" &&
+      typeof value.longitude === "number";
+
+    if (!hasCoordinates && !value.location) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a location or coordinates before searching nearby businesses.",
+        path: ["location"],
+      });
+    }
+  });
+
 export const questFormSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(3).max(120),
@@ -204,6 +243,8 @@ export type NearbyQuestCandidateGenerationInput = z.infer<
 >;
 export type NearbyPlacesSearchInput = z.infer<typeof nearbyPlacesSearchSchema>;
 export type NearbyPlacesSearchMode = z.infer<typeof nearbyPlacesSearchModeSchema>;
+export type NearbyBusinessType = z.infer<typeof nearbyBusinessTypeSchema>;
+export type NearbyBusinessSearchInput = z.infer<typeof nearbyBusinessSearchSchema>;
 export type QuestFormInput = z.infer<typeof questFormSchema>;
 export type RewardFormInput = z.infer<typeof rewardFormSchema>;
 export type TitleFormInput = z.infer<typeof titleFormSchema>;

@@ -47,11 +47,15 @@ Recommended setup:
 3. Add these environment variables in Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for the admin map explorer and Google Places workflow
    - `ADMIN_DEMO_ENABLED` if you want the explicit demo walkthrough button available during showcase runs
 4. Use the default Next.js build command for the admin app.
 5. Keep access limited to approved internal users.
 6. Promote admin accounts in `public.admin_users` after creating their Supabase Auth users.
 7. Share `/showcase` from the dashboard sidebar or use the `/showcase` route directly after sign-in.
+
+The admin map explorer is intentionally web-native and uses the Google Maps JavaScript API plus the
+Google Places library. It is not a Google Maps Embed screen, and it is not a mobile-native map SDK.
 
 Helpful commands:
 

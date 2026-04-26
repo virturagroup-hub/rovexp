@@ -31,10 +31,6 @@ export default async function MapExplorerPage({
     listStates(),
   ]);
 
-  const importedCount = places.length;
-  const candidateCount = candidates.length;
-  const publishedCount = quests.filter((quest) => Boolean(quest.place_id)).length;
-
   return (
     <div className="space-y-6">
       <StatusBanner code={params.error ?? params.status} />
@@ -43,34 +39,34 @@ export default async function MapExplorerPage({
         <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <CardHeader className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge className="bg-sky-100 text-sky-900">Map explorer</Badge>
-              <Badge variant="outline">Stored places</Badge>
+              <Badge className="bg-sky-100 text-sky-900">Google Maps + Places</Badge>
+              <Badge variant="outline">Live public places</Badge>
             </div>
             <CardTitle className="font-display text-3xl tracking-tight text-slate-950">
-              Search stored places or drop a new pin to seed the next quest source
+              Find nearby businesses on a real map, save the right spot, and turn it into a quest source
             </CardTitle>
             <p className="max-w-3xl text-sm leading-7 text-slate-600">
-              The map explorer has two clear workflows. Search only the stored places already in the
-              RoveXP database, or switch to manual add mode to drop a fresh pin and create a new
-              place record. This is an internal ops tool, not a live external places search.
+              Search real nearby businesses through Google Places by location and category, then
+              add the chosen spot into the RoveXP places table. Once a place is stored, you can
+              generate a quest candidate from it through the normal review flow.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             {[
               {
-                detail: "All imported location rows ready for inspection.",
-                label: "Places",
-                value: importedCount,
+                detail: "Search nearby businesses by location and type.",
+                label: "Search",
+                value: "Live",
               },
               {
-                detail: "Draft candidates already in the review pipeline.",
-                label: "Candidates",
-                value: candidateCount,
+                detail: "Save the selected business as a stored place record.",
+                label: "Store",
+                value: "Place",
               },
               {
-                detail: "Published live quests linked to place rows.",
-                label: "Live quests",
-                value: publishedCount,
+                detail: "Generate a quest candidate after the place is saved.",
+                label: "Next step",
+                value: "Quest",
               },
             ].map((item) => (
               <div
@@ -96,19 +92,20 @@ export default async function MapExplorerPage({
                 Map workflow
               </p>
               <h2 className="font-display text-2xl tracking-tight">
-                Find a spot and move it into the content pipeline
+                Search nearby businesses, pick one, and save it into the pipeline
               </h2>
               <p className="text-sm leading-7 text-slate-300">
-                The map explorer is designed for internal ops. It keeps humans in control while making
-                it much faster to find, add, and turn interesting places into quest candidates.
+                This tool uses public business data around the location you choose. It is not a
+                place import screen. Choose a location, filter by business type, then save the
+                selected business as a stored place or place-plus-candidate.
               </p>
             </div>
 
             <div className="space-y-3">
               {[
-                "Search only the stored places already imported into RoveXP.",
-                "Switch to manual add mode to drop a pin and create a new place record.",
-                "Inspect imported status, candidate status, and published quests in one view.",
+                "Choose a city, address, or coordinates for the search center.",
+                "Pick one or more business types, then click Search nearby businesses.",
+                "Select a result to save it as a stored place or generate a quest candidate.",
               ].map((item) => (
                 <div
                   key={item}
@@ -129,7 +126,7 @@ export default async function MapExplorerPage({
               <Button asChild variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
                 <Link href="/dashboard/places/nearby">
                   <Sparkles className="size-4" />
-                  Nearby generator
+                  Nearby candidate builder
                 </Link>
               </Button>
             </div>
@@ -151,8 +148,9 @@ export default async function MapExplorerPage({
               Future-ready
             </p>
             <p className="text-sm leading-7 text-slate-600">
-              When we add external place search later, this same map explorer can layer live search
-              results on top of the stored place corpus without changing the review/publish workflow.
+              When we add richer external discovery later, this same map explorer can layer more
+              sources on top of the nearby-business search without changing the review/publish
+              workflow.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

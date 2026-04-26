@@ -67,6 +67,7 @@ cp apps/admin/.env.example apps/admin/.env.local
 - mobile can optionally use `EXPO_PUBLIC_OAUTH_GOOGLE_ENABLED`, `EXPO_PUBLIC_OAUTH_FACEBOOK_ENABLED`, and `EXPO_PUBLIC_OAUTH_APPLE_ENABLED`
 - mobile also uses `EXPO_PUBLIC_DEFAULT_AREA_LABEL`, `EXPO_PUBLIC_DEFAULT_LATITUDE`, `EXPO_PUBLIC_DEFAULT_LONGITUDE`, and `EXPO_PUBLIC_DEFAULT_STATE_CODE`
 - admin uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- admin web map explorer also uses `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - admin can optionally use `ADMIN_DEMO_ENABLED` to expose the showcase walkthrough entry
 - admin also exposes a dedicated `/showcase` route inside the admin portal for judges/testers
 
@@ -117,6 +118,7 @@ Admin app:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for the admin Google Maps/Places explorer
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback only)
 
 Keep secret/service-role keys out of the mobile and admin app code. The repository only uses public/publishable keys in client-facing environments.
@@ -125,6 +127,10 @@ Mobile OAuth redirect URL: `rovexp://auth/callback`
 Supported mobile auth providers: email/password, Google, Facebook, and Apple on supported platforms.
 
 Mobile keeps a mock-safe fallback when Supabase env values are blank. If Supabase is configured but a live request fails, the app shows an explicit runtime warning instead of pretending the backend is healthy. The admin dashboard now requires real Supabase env values and a user promoted in `public.admin_users`.
+
+The admin map explorer uses the Google Maps JavaScript API for the interactive map canvas and the
+Google Places library for autocomplete, nearby discovery, and place details. It is web-only for the
+admin app and does not use the mobile-native map stack.
 
 ## Supabase
 

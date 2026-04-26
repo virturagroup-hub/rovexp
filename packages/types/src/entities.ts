@@ -123,6 +123,49 @@ export interface PlaceWithRelations extends Place {
   state: StateRecord | null;
 }
 
+export type NearbyBusinessSource = "openstreetmap" | "demo-fixture";
+
+export interface NearbyBusinessResult {
+  id: string;
+  source: NearbyBusinessSource;
+  source_id: string;
+  name: string;
+  place_type: string;
+  category_label: string;
+  latitude: number;
+  longitude: number;
+  distance_miles: number;
+  address: string | null;
+  city: string | null;
+  state_code: string | null;
+  state_name: string | null;
+  website: string | null;
+  phone: string | null;
+  image_url: string | null;
+  rating: number | null;
+  review_count: number | null;
+  tags: Record<string, string>;
+}
+
+export interface NearbyBusinessSearchCenter {
+  latitude: number;
+  longitude: number;
+  label: string;
+  resolved_from: "coordinates" | "location";
+  state_code: string | null;
+  state_name: string | null;
+}
+
+export interface NearbyBusinessSearchResponse {
+  center: NearbyBusinessSearchCenter;
+  query: string;
+  radius_miles: number;
+  source: NearbyBusinessSource;
+  total: number;
+  types: string[];
+  results: NearbyBusinessResult[];
+}
+
 export interface QuestCandidate {
   id: string;
   place_id: string;
