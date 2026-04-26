@@ -37,6 +37,7 @@ supabase db reset
 ## Admin on Vercel
 
 The admin dashboard is designed to be deployed as a standalone private/internal Vercel app.
+It includes a dedicated map explorer at `/dashboard/places/map` for place discovery and quest seeding.
 
 Recommended setup:
 
@@ -45,6 +46,7 @@ Recommended setup:
 3. Add these environment variables in Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `ADMIN_DEMO_ENABLED` if you want the explicit demo walkthrough button available during showcase runs
 4. Use the default Next.js build command for the admin app.
 5. Keep access limited to approved internal users.
 6. Promote admin accounts in `public.admin_users` after creating their Supabase Auth users.
@@ -104,6 +106,9 @@ For testers and judges:
 
 The app surfaces runtime status explicitly so testers can tell whether they are using live data, demo data, or a backend fallback.
 
+The admin portal also supports an intentional demo walkthrough path when `ADMIN_DEMO_ENABLED=true`.
+That path is useful for showcasing the dashboard, places, map explorer, candidates, and moderation tools without needing a privileged live account every time.
+
 ## Manual Steps Outside the Repo
 
 These still need to happen in external dashboards or accounts:
@@ -115,6 +120,7 @@ These still need to happen in external dashboards or accounts:
 5. Enable any OAuth providers you actually want to use in the Supabase Auth dashboard.
 6. Register the Apple bundle identifier and Android package in the Apple/Google developer consoles if you are shipping real builds.
 7. Link the repo to Vercel and the Expo project to EAS before building.
+8. Optionally set `ADMIN_DEMO_ENABLED=true` for showcase deployments that should expose the demo walkthrough button.
 
 ## Access Paths for a Showcase
 
@@ -124,4 +130,3 @@ Provide these to judges/testers:
 - Admin Vercel URL
 - Android internal build link or APK/AAB path
 - iOS TestFlight link
-

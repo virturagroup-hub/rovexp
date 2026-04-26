@@ -29,6 +29,12 @@ const navigation = [
     description: "Import and curate real-world points of interest.",
   },
   {
+    href: "/dashboard/places/map",
+    iconKey: "map",
+    label: "Map",
+    description: "Search places visually and seed content from the map.",
+  },
+  {
     href: "/dashboard/candidates",
     iconKey: "candidates",
     label: "Candidates",
@@ -75,9 +81,12 @@ const navigation = [
 interface AdminShellProps {
   children: React.ReactNode;
   user: AdminSession["user"];
+  mode: AdminSession["mode"];
 }
 
-export function AdminShell({ children, user }: AdminShellProps) {
+export function AdminShell({ children, user, mode }: AdminShellProps) {
+  const isDemoMode = mode === "demo";
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.25),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.14),_transparent_28%),linear-gradient(180deg,_#f5f7fb_0%,_#edf2f7_100%)]">
       <div className="mx-auto grid min-h-screen max-w-[1600px] gap-6 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-6">
@@ -111,6 +120,22 @@ export function AdminShell({ children, user }: AdminShellProps) {
             </div>
           </div>
 
+          {isDemoMode ? (
+            <div className="mt-5 rounded-3xl border border-sky-200 bg-sky-50/90 p-4 text-sky-950">
+              <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
+                Demo walkthrough
+              </p>
+              <p className="mt-2 text-sm leading-7">
+                This mode uses the seeded mock admin store so you can explore the dashboard safely.
+              </p>
+              <div className="mt-4 grid gap-2 text-sm leading-6 text-sky-900">
+                <div className="rounded-2xl bg-white/80 px-3 py-2">1. Explore Dashboard and Sponsors</div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">2. Open Places and Map to seed content</div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">3. Review Candidates and publish later</div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-6 flex-1">
             <SidebarNav items={[...navigation]} />
           </div>
@@ -120,7 +145,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
               type="submit"
               className="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
-              Sign out
+              {isDemoMode ? "Exit demo" : "Sign out"}
               <LogOut className="size-4" />
             </button>
           </form>
@@ -142,7 +167,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
                   Access Mode
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                  Supabase Live
+                  {isDemoMode ? "Demo walkthrough" : "Supabase Live"}
                 </p>
               </div>
             </div>

@@ -16,6 +16,7 @@ Private internal dashboard for operating quests, sponsors, rewards, titles, badg
 - `/dashboard`
 - `/dashboard/sponsors`
 - `/dashboard/places`
+- `/dashboard/places/map`
 - `/dashboard/places/nearby`
 - `/dashboard/candidates`
 - `/dashboard/quests`
@@ -36,7 +37,7 @@ corepack pnpm install
 2. Copy envs:
 
 ```bash
-cp .env.example .env.local
+cp apps/admin/.env.example apps/admin/.env.local
 ```
 
 3. Fill in `apps/admin/.env.local` with the real Supabase project URL and publishable key.
@@ -47,13 +48,14 @@ cp .env.example .env.local
 corepack pnpm --filter @rovexp/admin dev
 ```
 
-4. Open `http://localhost:3000`.
+5. Open `http://localhost:3000`.
 
 ## Environment Variables
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback only)
+- `ADMIN_DEMO_ENABLED` (showcase/demo walkthrough toggle)
 
 ## Auth
 
@@ -70,6 +72,25 @@ insert into public.admin_users (user_id, role)
 values ('replace-with-auth-user-uuid', 'owner')
 on conflict (user_id) do update set role = excluded.role;
 ```
+
+## Demo Walkthrough Mode
+
+If `ADMIN_DEMO_ENABLED=true`, the `/login` page shows a clearly labeled demo walkthrough entry path.
+That path uses the seeded mock admin store and is meant for showcase exploration only.
+
+- live auth still works normally
+- demo mode is only entered when the user explicitly chooses it
+- demo mode can be disabled in production by leaving `ADMIN_DEMO_ENABLED` unset or `false`
+
+The demo walkthrough highlights the major admin surfaces:
+
+- Dashboard
+- Sponsors
+- Places
+- Map explorer
+- Candidates
+- Reviews
+- Users
 
 ## Vercel Deployment
 

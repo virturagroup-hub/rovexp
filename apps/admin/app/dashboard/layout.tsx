@@ -8,5 +8,9 @@ export default async function DashboardLayout({
 }) {
   const session = await requireAdminSession();
 
-  return <AdminShell user={session.user}>{children}</AdminShell>;
+  return (
+    <AdminShell mode={session.mode} user={session.user}>
+      {children}
+    </AdminShell>
+  );
 }

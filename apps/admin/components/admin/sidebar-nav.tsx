@@ -11,6 +11,7 @@ import {
   MapPin,
   MapPinned,
   MessageSquare,
+  Map,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 export type SidebarNavIconKey =
   | "dashboard"
   | "places"
+  | "map"
   | "candidates"
   | "sponsors"
   | "quests"
@@ -45,6 +47,7 @@ const iconMap: Record<SidebarNavIconKey, React.ComponentType<{ className?: strin
   dashboard: LayoutDashboard,
   candidates: Layers3,
   places: MapPin,
+  map: Map,
   quests: MapPinned,
   rewards: Gift,
   reviews: MessageSquare,

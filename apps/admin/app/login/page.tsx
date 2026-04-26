@@ -6,7 +6,8 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getAdminSession } from "@/lib/admin/auth";
-import { signInAction } from "@/lib/admin/actions";
+import { enterDemoAction, signInAction } from "@/lib/admin/actions";
+import { isAdminDemoEnabled } from "@/lib/admin/demo";
 import { isSupabaseConfigured } from "@/lib/admin/supabase";
 
 interface LoginPageProps {
@@ -131,6 +132,28 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   The admin dashboard now requires real Supabase auth. Add the
                   environment variables, create an auth user, then promote that
                   user in <code className="mx-1 rounded bg-white/80 px-1.5 py-0.5 text-xs">public.admin_users</code>.
+                </div>
+              )}
+
+              {isAdminDemoEnabled ? (
+                <div className="space-y-3 rounded-[1.75rem] border border-sky-200 bg-sky-50/80 p-5">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
+                      Showcase path
+                    </p>
+                    <p className="text-sm leading-7 text-sky-950">
+                      Try a safe demo walkthrough that uses the seeded mock admin store and keeps live content untouched.
+                    </p>
+                  </div>
+                  <form action={enterDemoAction}>
+                    <SubmitButton className="bg-sky-700 text-white hover:bg-sky-600">
+                      Open demo walkthrough
+                    </SubmitButton>
+                  </form>
+                </div>
+              ) : (
+                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                  Demo walkthrough mode is disabled in this deployment.
                 </div>
               )}
             </CardContent>

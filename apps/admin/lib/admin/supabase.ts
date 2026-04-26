@@ -1,6 +1,8 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+import { isAdminDemoActive } from "./demo";
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -9,6 +11,10 @@ const supabaseKey =
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 export async function getSupabaseServerClient() {
+  if (await isAdminDemoActive()) {
+    return null;
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return null;
   }

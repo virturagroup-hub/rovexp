@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Layers3, MapPin, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Layers3, MapPinned, MapPin, Plus, Sparkles } from "lucide-react";
 
 import { StatusBanner } from "@/components/admin/status-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -84,20 +84,31 @@ export default async function PlacesPage({ searchParams }: PlacesPageProps) {
         <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
-              Nearby generation utility
+              Discovery utilities
             </p>
-            <h2 className="font-display text-2xl tracking-tight">Bulk-generate quest candidates by area</h2>
+            <h2 className="font-display text-2xl tracking-tight">
+              Explore the map or bulk-generate quest candidates by area
+            </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-300">
-              Open the nearby generator to preview stored places around a state, city, or pin, then
-              create draft candidates in one admin-controlled pass.
+              Use the map explorer to visually seed new places, or open the nearby generator to
+              preview stored places around a state, city, or pin and create draft candidates in one
+              admin-controlled pass.
             </p>
           </div>
-          <Button asChild className="bg-white text-slate-950 hover:bg-slate-100">
-            <Link href="/dashboard/places/nearby">
-              Open nearby generator
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="bg-white text-slate-950 hover:bg-slate-100">
+              <Link href="/dashboard/places/map">
+                <MapPinned className="size-4" />
+                Open map explorer
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
+              <Link href="/dashboard/places/nearby">
+                Open nearby generator
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

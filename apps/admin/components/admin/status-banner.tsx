@@ -21,6 +21,18 @@ const banners = {
     body: "The metadata or rule JSON could not be parsed. Fix the syntax and submit again.",
     tone: "warning",
   },
+  "demo-disabled": {
+    icon: AlertCircle,
+    title: "Demo mode unavailable",
+    body: "The demo walkthrough is turned off in this deployment.",
+    tone: "warning",
+  },
+  "demo-mode": {
+    icon: CheckCircle2,
+    title: "Demo mode active",
+    body: "You are exploring a mock-backed walkthrough. Sign out to return to the live admin path.",
+    tone: "info",
+  },
   generated: {
     icon: CheckCircle2,
     title: "Candidate generated",
@@ -102,6 +114,7 @@ export function StatusBanner({ code }: StatusBannerProps) {
           "border-emerald-200 bg-emerald-50 text-emerald-900",
         banner.tone === "warning" &&
           "border-amber-200 bg-amber-50 text-amber-950",
+        banner.tone === "info" && "border-sky-200 bg-sky-50 text-sky-950",
       )}
     >
       <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-white/80">

@@ -1,10 +1,11 @@
 import type { AdminRole } from "@rovexp/types";
 import { redirect } from "next/navigation";
 
+import { clearAdminDemoMode, isAdminDemoActive } from "./demo";
 import { getSupabaseServerClient, isSupabaseConfigured } from "./supabase";
 
 export interface AdminSession {
-  mode: "supabase";
+  mode: "supabase" | "demo";
   user: {
     id: string;
     email: string;
@@ -13,7 +14,21 @@ export interface AdminSession {
   };
 }
 
+const demoSession: AdminSession = {
+  mode: "demo",
+  user: {
+    id: "demo-admin",
+    email: "demo@rovexp.app",
+    displayName: "Demo Guide",
+    role: "owner",
+  },
+};
+
 export async function getAdminSession(): Promise<AdminSession | null> {
+  if (await isAdminDemoActive()) {
+    return demoSession;
+  }
+
   if (!isSupabaseConfigured) {
     return null;
   }
@@ -58,6 +73,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 }
 
 export async function requireAdminSession() {
+  if (await isAdminDemoActive()) {
+    return demoSession;
+  }
+
   if (!isSupabaseConfigured) {
     redirect("/login?error=missing-env");
   }
@@ -99,4 +118,8 @@ export async function requireAdminSession() {
       role: adminMembership.role,
     },
   } satisfies AdminSession;
+}
+
+export async function clearDemoSession() {
+  await clearAdminDemoMode();
 }

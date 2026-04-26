@@ -15,7 +15,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireAdminSession } from "./auth";
+import { clearDemoSession, requireAdminSession } from "./auth";
+import { enableAdminDemoMode, isAdminDemoEnabled } from "./demo";
 import {
   generateQuestCandidateFromPlace,
   generateNearbyQuestCandidates,
@@ -84,6 +85,32 @@ function parseImportPayload(value?: string) {
   return [];
 }
 
+function parsePlacePayload(formData: FormData) {
+  return placeFormSchema.safeParse({
+    address: readString(formData, "address"),
+    city: readString(formData, "city"),
+    description: readString(formData, "description"),
+    external_id: readString(formData, "external_id"),
+    external_source: readString(formData, "external_source"),
+    id: readString(formData, "id") || undefined,
+    image_url: readString(formData, "image_url"),
+    is_active: readBoolean(formData, "is_active"),
+    is_publicly_visitable: readBoolean(formData, "is_publicly_visitable"),
+    latitude: readNumber(formData, "latitude"),
+    longitude: readNumber(formData, "longitude"),
+    name: readString(formData, "name"),
+    phone: readString(formData, "phone"),
+    place_type: readString(formData, "place_type"),
+    price_level: readOptionalNumber(formData, "price_level"),
+    rating: readOptionalNumber(formData, "rating"),
+    source_metadata: readString(formData, "source_metadata"),
+    state_code: readString(formData, "state_code"),
+    state_id: readString(formData, "state_id"),
+    website: readString(formData, "website"),
+    review_count: readOptionalNumber(formData, "review_count"),
+  });
+}
+
 function normalizeImportedPlace(row: Record<string, unknown>) {
   return {
     address: typeof row.address === "string" ? row.address : "",
@@ -125,6 +152,8 @@ function normalizeImportedPlace(row: Record<string, unknown>) {
 }
 
 export async function signInAction(formData: FormData) {
+  await clearDemoSession();
+
   if (!isSupabaseConfigured) {
     redirect("/login?error=missing-env");
   }
@@ -173,10 +202,28 @@ export async function signInAction(formData: FormData) {
 }
 
 export async function signOutAction() {
+  await clearDemoSession();
+
   const supabase = await getSupabaseServerClient();
   await supabase?.auth.signOut();
 
   redirect("/login?status=signed-out");
+}
+
+export async function enterDemoAction() {
+  if (!isAdminDemoEnabled) {
+    redirect("/login?error=missing-env");
+  }
+
+  await clearDemoSession();
+
+  const supabase = await getSupabaseServerClient();
+  await supabase?.auth.signOut();
+
+  await enableAdminDemoMode();
+
+  revalidatePath("/dashboard");
+  redirect("/dashboard?status=demo-mode");
 }
 
 export async function saveSponsorAction(formData: FormData) {
@@ -213,29 +260,7 @@ export async function saveSponsorAction(formData: FormData) {
 export async function savePlaceAction(formData: FormData) {
   await requireAdminSession();
 
-  const parsed = placeFormSchema.safeParse({
-    address: readString(formData, "address"),
-    city: readString(formData, "city"),
-    description: readString(formData, "description"),
-    external_id: readString(formData, "external_id"),
-    external_source: readString(formData, "external_source"),
-    id: readString(formData, "id") || undefined,
-    image_url: readString(formData, "image_url"),
-    is_active: readBoolean(formData, "is_active"),
-    is_publicly_visitable: readBoolean(formData, "is_publicly_visitable"),
-    latitude: readNumber(formData, "latitude"),
-    longitude: readNumber(formData, "longitude"),
-    name: readString(formData, "name"),
-    phone: readString(formData, "phone"),
-    place_type: readString(formData, "place_type"),
-    price_level: readOptionalNumber(formData, "price_level"),
-    rating: readOptionalNumber(formData, "rating"),
-    source_metadata: readString(formData, "source_metadata"),
-    state_code: readString(formData, "state_code"),
-    state_id: readString(formData, "state_id"),
-    website: readString(formData, "website"),
-    review_count: readOptionalNumber(formData, "review_count"),
-  });
+  const parsed = parsePlacePayload(formData);
 
   if (!parsed.success) {
     redirect("/dashboard/places?error=check-form");
@@ -403,6 +428,99 @@ export async function generateQuestCandidateAction(formData: FormData) {
     redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
   } catch {
     redirect("/dashboard/places?error=check-form");
+  }
+}
+
+export async function savePlaceFromMapAction(formData: FormData) {
+  await requireAdminSession();
+
+  const parsed = parsePlacePayload(formData);
+
+  if (!parsed.success) {
+    redirect("/dashboard/places/map?error=check-form");
+  }
+
+  try {
+    await savePlace({
+      address: toNullable(parsed.data.address),
+      city: toNullable(parsed.data.city),
+      description: toNullable(parsed.data.description),
+      external_id: toNullable(parsed.data.external_id),
+      external_source: toNullable(parsed.data.external_source),
+      id: parsed.data.id,
+      image_url: toNullable(parsed.data.image_url),
+      is_active: parsed.data.is_active,
+      is_publicly_visitable: parsed.data.is_publicly_visitable,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      name: parsed.data.name,
+      phone: toNullable(parsed.data.phone),
+      place_type: parsed.data.place_type,
+      price_level: parsed.data.price_level ?? null,
+      rating: parsed.data.rating ?? null,
+      review_count: parsed.data.review_count ?? null,
+      source_metadata: parseJson(parsed.data.source_metadata),
+      state_code: toNullable(parsed.data.state_code),
+      state_id: toNullable(parsed.data.state_id),
+      website: toNullable(parsed.data.website),
+    });
+  } catch {
+    redirect("/dashboard/places/map?error=check-form");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/places/map");
+  redirect("/dashboard/places/map?status=saved");
+}
+
+export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
+  await requireAdminSession();
+
+  const parsed = parsePlacePayload(formData);
+
+  if (!parsed.success) {
+    redirect("/dashboard/places/map?error=check-form");
+  }
+
+  try {
+    const savedPlace = await savePlace({
+      address: toNullable(parsed.data.address),
+      city: toNullable(parsed.data.city),
+      description: toNullable(parsed.data.description),
+      external_id: toNullable(parsed.data.external_id),
+      external_source: toNullable(parsed.data.external_source),
+      id: parsed.data.id,
+      image_url: toNullable(parsed.data.image_url),
+      is_active: parsed.data.is_active,
+      is_publicly_visitable: parsed.data.is_publicly_visitable,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      name: parsed.data.name,
+      phone: toNullable(parsed.data.phone),
+      place_type: parsed.data.place_type,
+      price_level: parsed.data.price_level ?? null,
+      rating: parsed.data.rating ?? null,
+      review_count: parsed.data.review_count ?? null,
+      source_metadata: parseJson(parsed.data.source_metadata),
+      state_code: toNullable(parsed.data.state_code),
+      state_id: toNullable(parsed.data.state_id),
+      website: toNullable(parsed.data.website),
+    });
+
+    if (!savedPlace?.id) {
+      redirect("/dashboard/places/map?error=check-form");
+    }
+
+    const candidate = await generateQuestCandidateFromPlace(savedPlace.id);
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/places");
+    revalidatePath("/dashboard/places/map");
+    revalidatePath("/dashboard/candidates");
+    redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
+  } catch {
+    redirect("/dashboard/places/map?error=check-form");
   }
 }
 

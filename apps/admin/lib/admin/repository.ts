@@ -1923,25 +1923,31 @@ export async function savePlace(payload: PlacePayload) {
   }
 
   if (payload.id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("places")
       .update(normalizedPayload)
-      .eq("id", payload.id);
+      .eq("id", payload.id)
+      .select("*, state:states(*)")
+      .single();
 
     if (error) {
       throw new Error(error.message);
     }
 
-    return null;
+    return data as PlaceWithRelations;
   }
 
-  const { error } = await supabase.from("places").insert(normalizedPayload);
+  const { data, error } = await supabase
+    .from("places")
+    .insert(normalizedPayload)
+    .select("*, state:states(*)")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return null;
+  return data as PlaceWithRelations;
 }
 
 export async function importPlaces(payloads: PlacePayload[]) {
