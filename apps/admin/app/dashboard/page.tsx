@@ -72,7 +72,7 @@ export default async function DashboardPage({
                 </h2>
                 <p className="max-w-2xl text-sm leading-7 text-white/82">
                   This route stays inside the admin site and walks through the mobile experience,
-                  the places pipeline, nearby candidate generation, and the review-publish loop.
+                  the content pipeline, nearby candidate generation, and the review-publish loop.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -83,13 +83,13 @@ export default async function DashboardPage({
                   Open showcase demo
                   <ArrowRight className="size-4" />
                 </Link>
-              <Link
-                href="/dashboard/places"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Open places
-                <Layers3 className="size-4" />
-              </Link>
+                <Link
+                  href="/dashboard/places"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Open places
+                  <Layers3 className="size-4" />
+                </Link>
               </div>
             </div>
 
@@ -133,8 +133,7 @@ export default async function DashboardPage({
               </h2>
               <p className="max-w-2xl text-sm leading-7 text-slate-600">
                 Auth-backed explorers, server-validated quest progression, review
-                moderation, and progression content now run through the same
-                control room.
+                moderation, and progression content now run through the same control room.
               </p>
             </div>
 

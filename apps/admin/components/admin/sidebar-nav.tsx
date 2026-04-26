@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Map,
   Sparkles,
+  Trophy,
   Users,
 } from "lucide-react";
 
@@ -54,7 +55,7 @@ const iconMap: Record<SidebarNavIconKey, React.ComponentType<{ className?: strin
   rewards: Gift,
   reviews: MessageSquare,
   sponsors: Compass,
-  titles: Sparkles,
+  titles: Trophy,
   users: Users,
 };
 

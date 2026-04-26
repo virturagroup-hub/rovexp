@@ -42,7 +42,7 @@ interface ShowcaseDemoProps {
 
 const steps = [
   {
-    body: "A mobile-first discovery app powered by real Supabase data and a content pipeline.",
+    body: "A mobile-first discovery app powered by Supabase-backed data and a clean content pipeline.",
     id: "overview",
     label: "What it is",
   },
@@ -329,15 +329,15 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-950">
-                RoveXP demo in one scrollable story.
-              </h1>
-              <p className="text-sm leading-7 text-slate-600">
-                Start here, then jump through the product and the ops workflow without leaving
-                the admin app.
-              </p>
-            </div>
+              <div className="space-y-2">
+                <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-950">
+                  RoveXP demo in one scrollable story.
+                </h1>
+                <p className="text-sm leading-7 text-slate-600">
+                  Start here, then jump through the product and the ops workflow without leaving
+                  the admin app.
+                </p>
+              </div>
 
             <div className="grid gap-2 text-sm">
               <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-slate-600">
@@ -359,9 +359,9 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
         <Card className="rounded-[2rem] border-slate-200/80 bg-white/88 shadow-[0_18px_52px_rgba(15,23,42,0.08)] backdrop-blur">
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                Walkthrough steps
-              </p>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Walkthrough steps
+                </p>
               <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-semibold text-white">
                 {activeStep + 1}/{steps.length}
               </span>
@@ -398,7 +398,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 Direct admin links
               </p>
               <p className="mt-2 font-display text-2xl font-semibold tracking-tight">
-                Open the real ops screens
+                Open the live ops screens
               </p>
             </div>
             <div className="space-y-2">

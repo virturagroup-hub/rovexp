@@ -123,15 +123,21 @@ export function AdminShell({ children, user, mode }: AdminShellProps) {
           {isDemoMode ? (
             <div className="mt-5 rounded-3xl border border-sky-200 bg-sky-50/90 p-4 text-sky-950">
               <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
-                Demo walkthrough
+                Demo mode
               </p>
               <p className="mt-2 text-sm leading-7">
-                This mode uses the seeded mock admin store so you can explore the dashboard safely.
+                This mode uses the seeded mock admin store so you can explore the dashboard safely without touching live content.
               </p>
               <div className="mt-4 grid gap-2 text-sm leading-6 text-sky-900">
-                <div className="rounded-2xl bg-white/80 px-3 py-2">1. Explore Dashboard and Sponsors</div>
-                <div className="rounded-2xl bg-white/80 px-3 py-2">2. Open Places and Nearby generator to seed content</div>
-                <div className="rounded-2xl bg-white/80 px-3 py-2">3. Review Candidates and publish later</div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">
+                  1. Explore dashboard, sponsors, and the showcase demo
+                </div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">
+                  2. Open Places and Nearby generation to seed content
+                </div>
+                <div className="rounded-2xl bg-white/80 px-3 py-2">
+                  3. Review candidates and publish later
+                </div>
               </div>
             </div>
           ) : null}
