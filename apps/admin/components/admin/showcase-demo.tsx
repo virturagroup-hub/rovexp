@@ -71,6 +71,11 @@ const steps = [
     id: "ops",
     label: "Admin ops",
   },
+  {
+    body: "A realistic roadmap for what a fuller production version could include next.",
+    id: "future",
+    label: "Future vision",
+  },
 ] as const;
 
 function DemoSection({
@@ -183,6 +188,44 @@ function PipelineCard({
       </div>
       <p className="mt-3 text-sm leading-7 text-slate-600">{body}</p>
       {action ? <div className="mt-4">{action}</div> : null}
+    </div>
+  );
+}
+
+function RoadmapCard({
+  body,
+  icon,
+  items,
+  kicker,
+  title,
+}: {
+  body: string;
+  icon: ReactNode;
+  items: string[];
+  kicker: string;
+  title: string;
+}) {
+  return (
+    <div className="flex h-full flex-col rounded-[1.6rem] border border-slate-200 bg-white/90 p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
+          {icon}
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{kicker}</p>
+          <p className="font-display text-xl font-semibold tracking-tight text-slate-950">
+            {title}
+          </p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-7 text-slate-600">{body}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <Badge key={item} variant="outline" className="border-slate-200 bg-slate-50">
+            {item}
+          </Badge>
+        ))}
+      </div>
     </div>
   );
 }
@@ -920,7 +963,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
           }
           eyebrow="Admin workflow"
           id="ops"
-          title="The control room stays narrow: sponsor ops, moderation, and map-first curation."
+          title="The control room stays narrow: sponsor ops, moderation, and stored-place curation."
         >
           <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
             <PipelineCard
@@ -1019,6 +1062,134 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 Expo app, the same Supabase project, and the same admin workflow the team uses
                 to keep quests fresh.
               </p>
+            </div>
+          </div>
+        </DemoSection>
+
+        <DemoSection
+          action={
+            <Badge className="bg-slate-950 text-white hover:bg-slate-950">
+              Roadmap
+            </Badge>
+          }
+          eyebrow="Future vision"
+          id="future"
+          title="What a full production version could include next."
+        >
+          <div className="rounded-[1.8rem] border border-sky-200 bg-[linear-gradient(135deg,_rgba(239,246,255,0.96),_rgba(255,251,235,0.92))] p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="max-w-3xl space-y-2">
+                <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
+                  Built today vs future roadmap
+                </p>
+                <p className="font-display text-2xl font-semibold tracking-tight text-slate-950">
+                  The showcase focuses on the working MVP, the mobile app, and the content
+                  pipeline. A fuller production version could expand from there.
+                </p>
+                <p className="text-sm leading-7 text-slate-600">
+                  These ideas are intentionally framed as roadmap opportunities, not
+                  shipped features. They show how RoveXP could grow into a broader,
+                  more scalable platform over time.
+                </p>
+              </div>
+              <div className="rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 shadow-sm">
+                Future only
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-[1.35rem] border border-white/70 bg-white/80 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  What exists now
+                </p>
+                <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                  <li>• Mobile quest board, sponsored spotlight, and progression flow</li>
+                  <li>• Admin places, candidates, quests, sponsors, reviews, and users</li>
+                  <li>• Demo mode and showcase walkthrough for judges and testers</li>
+                </ul>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/70 bg-white/80 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  What could come next
+                </p>
+                <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                  <li>• Richer maps, directions, and trip planning on the user side</li>
+                  <li>• Sponsor CRM tools, analytics, and renewal planning</li>
+                  <li>• Deeper achievement rewards, partnerships, and monetization layers</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <RoadmapCard
+              kicker="For users"
+              icon={<MapPin className="size-4" />}
+              title="Richer discovery, rewards, and social play"
+              body="A fuller production version could make the consumer experience feel even more city-native, social, and rewarding."
+              items={[
+                "Live quest map + directions",
+                "Achievements and level-up rewards",
+                "Friend challenges and group quests",
+                "Seasonal and city-specific routes",
+                "Push notifications and photo-first moments",
+              ]}
+            />
+            <RoadmapCard
+              kicker="For sponsors / businesses"
+              icon={<Sparkles className="size-4" />}
+              title="A stronger business and partnership layer"
+              body="Future sponsor tooling could look more like a lightweight CRM, giving partners clearer campaign visibility and planning."
+              items={[
+                "Campaign tracking and notes",
+                "Sponsor performance analytics",
+                "Reward partnerships and premium tiers",
+                "Renewals, contacts, and planning",
+                "Discounts, gift cards, and branded offers",
+              ]}
+            />
+            <RoadmapCard
+              kicker="For admins / operations"
+              icon={<Layers3 className="size-4" />}
+              title="Smarter curation and scaling tools"
+              body="Ops tooling could get stronger as the catalog grows, helping teams roll out cities and keep candidate quality high."
+              items={[
+                "Admin map and nearby place search",
+                "Better import / sync tooling",
+                "Candidate quality scoring",
+                "Advanced moderation dashboards",
+                "City rollout and coverage planning",
+              ]}
+            />
+            <RoadmapCard
+              kicker="For growth / scale"
+              icon={<Trophy className="size-4" />}
+              title="Monetization and support systems"
+              body="RoveXP could expand into a fuller platform with more structured monetization and support for larger partner programs."
+              items={[
+                "Featured city campaigns",
+                "Sponsor business onboarding tools",
+                "Reward catalog expansion",
+                "Conversion and foot-traffic insights",
+                "Premium sponsor experiences",
+              ]}
+            />
+          </div>
+
+          <div className="mt-5 rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="max-w-3xl space-y-1">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  A realistic next chapter
+                </p>
+                <p className="font-display text-lg font-semibold tracking-tight text-slate-950">
+                  The current build proves the core loop. Future work could deepen the
+                  product without changing the foundation.
+                </p>
+              </div>
+              <Badge className="bg-slate-950 text-white hover:bg-slate-950">
+                Roadmap ideas only
+              </Badge>
             </div>
           </div>
         </DemoSection>

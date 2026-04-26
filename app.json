@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "447bf771-9fc9-4e08-93c4-530482366b6d"
+      }
+    },
+    "android": {
+      "package": "com.virtura.rovexp"
+    },
+    "ios": {
+      "bundleIdentifier": "com.virtura.rovexp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
