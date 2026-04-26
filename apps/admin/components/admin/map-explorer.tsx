@@ -192,6 +192,7 @@ function statusLabel(
 function MapCanvas({
   bounds,
   draftPin,
+  emptyState,
   onCreateDraftPin,
   onSelectPlace,
   places,
@@ -199,6 +200,7 @@ function MapCanvas({
 }: {
   bounds: ReturnType<typeof buildBounds>;
   draftPin: DraftPin | null;
+  emptyState: string;
   onCreateDraftPin: (point: DraftPin) => void;
   onSelectPlace: (placeId: string) => void;
   places: PlaceWithRelations[];
@@ -238,6 +240,18 @@ function MapCanvas({
       </div>
 
       <div className="relative h-full min-h-[540px]">
+        {places.length === 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
+            <div className="max-w-xl rounded-[2rem] border border-white/10 bg-slate-950/55 px-6 py-5 text-center text-slate-100 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-300">No map results</p>
+              <p className="mt-2 font-display text-2xl tracking-tight text-white">{emptyState}</p>
+              <p className="mt-2 text-sm leading-7 text-slate-300">
+                Try widening the search or clearing a filter to bring stored places back onto the map.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {places.map((place) => {
           const position = projectToPercent(place.latitude, place.longitude, bounds);
           const selected = place.id === selectedPlaceId;
@@ -327,11 +341,16 @@ export function AdminMapExplorer({
   quests,
   states,
 }: AdminMapExplorerProps) {
-  const [query, setQuery] = useState("");
-  const [stateFilter, setStateFilter] = useState("all");
-  const [placeTypeFilter, setPlaceTypeFilter] = useState("all");
-  const [activeOnly, setActiveOnly] = useState(true);
-  const [publicOnly, setPublicOnly] = useState(true);
+  const [draftQuery, setDraftQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [draftStateFilter, setDraftStateFilter] = useState("all");
+  const [appliedStateFilter, setAppliedStateFilter] = useState("all");
+  const [draftPlaceTypeFilter, setDraftPlaceTypeFilter] = useState("all");
+  const [appliedPlaceTypeFilter, setAppliedPlaceTypeFilter] = useState("all");
+  const [draftActiveOnly, setDraftActiveOnly] = useState(true);
+  const [appliedActiveOnly, setAppliedActiveOnly] = useState(true);
+  const [draftPublicOnly, setDraftPublicOnly] = useState(true);
+  const [appliedPublicOnly, setAppliedPublicOnly] = useState(true);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(
     places[0]?.id ?? null,
   );
@@ -373,25 +392,32 @@ export function AdminMapExplorer({
   }, [places]);
 
   const filteredPlaces = useMemo(() => {
-    const normalizedQuery = normalize(query);
+    const normalizedQuery = normalize(appliedQuery);
 
     return places.filter((place) => {
       const placeStateId = place.state?.id ?? place.state_id ?? "";
       const placeStateCode = place.state?.code ?? place.state_code ?? "";
 
-      if (stateFilter !== "all" && placeStateId !== stateFilter && placeStateCode !== stateFilter) {
+      if (
+        appliedStateFilter !== "all" &&
+        placeStateId !== appliedStateFilter &&
+        placeStateCode !== appliedStateFilter
+      ) {
         return false;
       }
 
-      if (placeTypeFilter !== "all" && normalize(place.place_type) !== normalize(placeTypeFilter)) {
+      if (
+        appliedPlaceTypeFilter !== "all" &&
+        normalize(place.place_type) !== normalize(appliedPlaceTypeFilter)
+      ) {
         return false;
       }
 
-      if (activeOnly && !place.is_active) {
+      if (appliedActiveOnly && !place.is_active) {
         return false;
       }
 
-      if (publicOnly && !place.is_publicly_visitable) {
+      if (appliedPublicOnly && !place.is_publicly_visitable) {
         return false;
       }
 
@@ -399,18 +425,22 @@ export function AdminMapExplorer({
         return true;
       }
 
-      return matchesSearch(place, query);
+      return matchesSearch(place, appliedQuery);
     });
-  }, [activeOnly, placeTypeFilter, places, publicOnly, query, stateFilter]);
+  }, [
+    appliedActiveOnly,
+    appliedPlaceTypeFilter,
+    appliedPublicOnly,
+    appliedQuery,
+    places,
+    appliedStateFilter,
+  ]);
 
-  const visiblePlaces = filteredPlaces.length > 0 ? filteredPlaces : places;
+  const visiblePlaces = filteredPlaces;
   const bounds = useMemo(() => buildBounds(visiblePlaces), [visiblePlaces]);
 
   const selectedPlace =
-    places.find((place) => place.id === selectedPlaceId) ??
-    filteredPlaces[0] ??
-    places[0] ??
-    null;
+    filteredPlaces.find((place) => place.id === selectedPlaceId) ?? filteredPlaces[0] ?? null;
   const selectedCandidate = selectedPlace
     ? candidateByPlaceId.get(selectedPlace.id) ?? null
     : null;
@@ -431,26 +461,60 @@ export function AdminMapExplorer({
 
   const selectedPlaceVisible =
     selectedPlace !== null && filteredPlaces.some((place) => place.id === selectedPlace.id);
+  const searchHasBeenApplied =
+    Boolean(appliedQuery) ||
+    appliedStateFilter !== "all" ||
+    appliedPlaceTypeFilter !== "all" ||
+    !appliedActiveOnly ||
+    !appliedPublicOnly;
+
+  const runSearch = () => {
+    setAppliedQuery(draftQuery.trim());
+    setAppliedStateFilter(draftStateFilter);
+    setAppliedPlaceTypeFilter(draftPlaceTypeFilter);
+    setAppliedActiveOnly(draftActiveOnly);
+    setAppliedPublicOnly(draftPublicOnly);
+  };
+
+  const resetSearch = () => {
+    setDraftQuery("");
+    setDraftStateFilter("all");
+    setDraftPlaceTypeFilter("all");
+    setDraftActiveOnly(true);
+    setDraftPublicOnly(true);
+    setAppliedQuery("");
+    setAppliedStateFilter("all");
+    setAppliedPlaceTypeFilter("all");
+    setAppliedActiveOnly(true);
+    setAppliedPublicOnly(true);
+  };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
       <section className="space-y-5">
         <Card className="rounded-[2rem] border-white/70 bg-white/84 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <CardContent className="space-y-4 p-5">
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                runSearch();
+              }}
+            >
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <Search className="size-4 text-slate-400" />
                 <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  value={draftQuery}
+                  onChange={(event) => setDraftQuery(event.target.value)}
                   placeholder="Search business, landmark, address, city, or place name"
                   className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                 />
               </div>
 
               <select
-                value={stateFilter}
-                onChange={(event) => setStateFilter(event.target.value)}
+                value={draftStateFilter}
+                onChange={(event) => setDraftStateFilter(event.target.value)}
                 className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 shadow-sm"
               >
                 <option value="all">All states</option>
@@ -462,8 +526,8 @@ export function AdminMapExplorer({
               </select>
 
               <select
-                value={placeTypeFilter}
-                onChange={(event) => setPlaceTypeFilter(event.target.value)}
+                value={draftPlaceTypeFilter}
+                onChange={(event) => setDraftPlaceTypeFilter(event.target.value)}
                 className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 shadow-sm"
               >
                 <option value="all">All place types</option>
@@ -478,34 +542,35 @@ export function AdminMapExplorer({
             <div className="flex flex-wrap gap-3">
               <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <input
-                  checked={activeOnly}
-                  onChange={(event) => setActiveOnly(event.target.checked)}
+                  checked={draftActiveOnly}
+                  onChange={(event) => setDraftActiveOnly(event.target.checked)}
                   type="checkbox"
                 />
                 Active only
               </label>
               <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <input
-                  checked={publicOnly}
-                  onChange={(event) => setPublicOnly(event.target.checked)}
+                  checked={draftPublicOnly}
+                  onChange={(event) => setDraftPublicOnly(event.target.checked)}
                   type="checkbox"
                 />
                 Public only
               </label>
               <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setQuery("");
-                  setStateFilter("all");
-                  setPlaceTypeFilter("all");
-                  setActiveOnly(true);
-                  setPublicOnly(true);
-                }}
+                type="submit"
+                className="bg-slate-950 text-white hover:bg-slate-800"
               >
+                Search places
+              </Button>
+              <Button type="button" variant="outline" onClick={resetSearch}>
                 Reset filters
               </Button>
             </div>
+            <p className="text-xs leading-6 text-slate-500">
+              Search applies the current draft filters to the map and result list. If no places match,
+              the map shows an explicit empty state instead of silently falling back to everything.
+            </p>
+            </form>
           </CardContent>
         </Card>
 
@@ -514,6 +579,11 @@ export function AdminMapExplorer({
           draftPin={draftPin}
           onCreateDraftPin={setDraftPin}
           onSelectPlace={setSelectedPlaceId}
+          emptyState={
+            searchHasBeenApplied
+              ? "No places matched this search"
+              : "Run a search to load the map"
+          }
           places={filteredPlaces}
           selectedPlaceId={selectedPlaceId}
         />
@@ -536,6 +606,11 @@ export function AdminMapExplorer({
             </div>
           ))}
         </div>
+        <p className="text-xs leading-6 text-slate-500">
+          {searchHasBeenApplied
+            ? `${formatCount(filteredPlaces.length)} places are matching the current search.`
+            : "The map is waiting for a search. Press Search places to apply the draft filters."}
+        </p>
       </section>
 
       <aside className="space-y-5">
