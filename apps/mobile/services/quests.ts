@@ -45,8 +45,11 @@ export interface FeedLocationInput {
   stateCode: string;
 }
 
-function buildFallbackFeedItems(location: FeedLocationInput) {
-  return demoQuests
+function buildStaticFeedItems(
+  location: FeedLocationInput,
+  quests = demoQuests,
+) {
+  return quests
     .filter((item) => item.is_active)
     .map((quest) => {
       const distanceMeters = distanceBetweenMeters(location, quest);
@@ -58,6 +61,41 @@ function buildFallbackFeedItems(location: FeedLocationInput) {
       };
     })
     .sort((left, right) => left.distanceMeters - right.distanceMeters);
+}
+
+function applyQuestFilters(
+  quests: QuestFeedItem[],
+  filters: QuestFilterPreferences,
+) {
+  return quests.filter((quest) => {
+    if (
+      filters.category_slugs.length &&
+      !filters.category_slugs.includes(quest.category.slug)
+    ) {
+      return false;
+    }
+
+    if (filters.rarities.length && !filters.rarities.includes(quest.rarity)) {
+      return false;
+    }
+
+    if (
+      filters.discovery_types.length &&
+      !filters.discovery_types.includes(quest.discovery_type)
+    ) {
+      return false;
+    }
+
+    if (filters.sponsor_filter === "sponsored" && !quest.is_sponsored) {
+      return false;
+    }
+
+    if (filters.sponsor_filter === "regular" && quest.is_sponsored) {
+      return false;
+    }
+
+    return true;
+  });
 }
 
 function mapRpcQuestRow(row: any): QuestFeedItem {
@@ -137,8 +175,25 @@ async function getHiddenSponsoredQuestIds(): Promise<string[]> {
 async function getQuestCatalog(params: {
   filters: QuestFilterPreferences;
   location: FeedLocationInput;
+  demoMode?: boolean;
   limitCount?: number;
 }): Promise<{ items: QuestFeedItem[]; runtime: QuestFeedRuntime }> {
+  if (params.demoMode) {
+    const curatedItems = buildStaticFeedItems(params.location);
+    const filteredItems = applyQuestFilters(curatedItems, params.filters);
+    const items = filteredItems.length ? filteredItems : curatedItems;
+
+    return {
+      items: items.slice(0, params.limitCount ?? 40),
+      runtime: {
+        message: filteredItems.length
+          ? "Curated demo quests are loaded for showcase mode."
+          : "The demo filters were narrow, so RoveXP is showing the full curated board.",
+        source: "demo",
+      },
+    };
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase) {
@@ -175,42 +230,7 @@ async function getQuestCatalog(params: {
     warnSupabaseFallback("Quest feed", detail);
 
     return {
-      items: buildFallbackFeedItems(params.location)
-        .filter((quest) => {
-          if (
-            params.filters.category_slugs.length &&
-            !params.filters.category_slugs.includes(quest.category.slug)
-        ) {
-          return false;
-        }
-
-        if (
-          params.filters.rarities.length &&
-          !params.filters.rarities.includes(quest.rarity)
-        ) {
-          return false;
-        }
-
-        if (
-          params.filters.discovery_types.length &&
-          !params.filters.discovery_types.includes(quest.discovery_type)
-        ) {
-          return false;
-        }
-
-        if (
-          params.filters.sponsor_filter === "sponsored" &&
-          !quest.is_sponsored
-        ) {
-          return false;
-        }
-
-        if (params.filters.sponsor_filter === "regular" && quest.is_sponsored) {
-          return false;
-        }
-
-          return true;
-        })
+      items: applyQuestFilters(buildStaticFeedItems(params.location), params.filters)
         .slice(0, params.limitCount ?? 40),
       runtime: {
         message: detail,
@@ -219,44 +239,10 @@ async function getQuestCatalog(params: {
     };
   }
 
-  const filtered = buildFallbackFeedItems(params.location).filter((quest) => {
-    if (
-      params.filters.category_slugs.length &&
-      !params.filters.category_slugs.includes(quest.category.slug)
-    ) {
-      return false;
-    }
-
-    if (
-      params.filters.rarities.length &&
-      !params.filters.rarities.includes(quest.rarity)
-    ) {
-      return false;
-    }
-
-    if (
-      params.filters.discovery_types.length &&
-      !params.filters.discovery_types.includes(quest.discovery_type)
-    ) {
-      return false;
-    }
-
-    if (
-      params.filters.sponsor_filter === "sponsored" &&
-      !quest.is_sponsored
-    ) {
-      return false;
-    }
-
-    if (
-      params.filters.sponsor_filter === "regular" &&
-      quest.is_sponsored
-    ) {
-      return false;
-    }
-
-    return true;
-  });
+  const filtered = applyQuestFilters(
+    buildStaticFeedItems(params.location),
+    params.filters,
+  );
 
   return {
     items: filtered.slice(0, params.limitCount ?? 40),
@@ -293,8 +279,14 @@ export async function getQuestById(questId: string) {
   return demoQuests.find((quest) => quest.id === questId) ?? null;
 }
 
-export async function getQuestCategories(): Promise<QuestCategory[]> {
+export async function getQuestCategories(params?: {
+  demoMode?: boolean;
+}): Promise<QuestCategory[]> {
   const supabase = getSupabaseClient();
+
+  if (params?.demoMode) {
+    return demoQuestCategories;
+  }
 
   if (supabase) {
     const { data, error } = await supabase
@@ -318,6 +310,7 @@ export async function getQuestCategories(): Promise<QuestCategory[]> {
 export async function getQuestFeed(params: {
   filters: QuestFilterPreferences;
   location: FeedLocationInput | null;
+  demoMode?: boolean;
   radiusMiles: number;
 }): Promise<QuestFeedResult> {
   const fallbackLocation = {
@@ -326,10 +319,13 @@ export async function getQuestFeed(params: {
     longitude: mobileEnv.defaultLongitude,
     stateCode: mobileEnv.defaultStateCode,
   };
-  const activeLocation = params.location ?? fallbackLocation;
+  const activeLocation = params.demoMode
+    ? fallbackLocation
+    : params.location ?? fallbackLocation;
   const source = await getQuestCatalog({
     filters: params.filters,
     location: activeLocation,
+    demoMode: params.demoMode,
   });
   const hiddenSponsoredQuestIds = new Set(await getHiddenSponsoredQuestIds());
 
@@ -347,11 +343,17 @@ export async function getQuestFeed(params: {
     sponsored: source.items
       .filter((quest) => quest.is_sponsored && !hiddenSponsoredQuestIds.has(quest.id))
       .slice(0, 4),
-    usingFallbackLocation: !params.location,
+    usingFallbackLocation: params.demoMode || !params.location,
   };
 }
 
-export async function getQuestProgressSnapshot() {
+export async function getQuestProgressSnapshot(params?: {
+  demoMode?: boolean;
+}) {
+  if (params?.demoMode) {
+    return demoQuestProgress;
+  }
+
   const supabase = getSupabaseClient() as any;
   const userId = await getCurrentSupabaseUserId();
 
@@ -387,8 +389,18 @@ export async function getQuestProgressSnapshot() {
   return demoQuestProgress;
 }
 
-export async function acceptQuest(params: { questId: string }) {
+export async function acceptQuest(params: {
+  demoMode?: boolean;
+  questId: string;
+}) {
   const now = new Date().toISOString();
+  if (params.demoMode) {
+    return {
+      acceptanceId: makeLocalId("accept"),
+      acceptedAt: now,
+    };
+  }
+
   const supabase = getSupabaseClient() as any;
   const userId = await getCurrentSupabaseUserId();
 
@@ -437,10 +449,25 @@ export async function acceptQuest(params: { questId: string }) {
 export async function checkInQuest(params: {
   allowMockVerification: boolean;
   currentLocation: { latitude: number; longitude: number } | null;
+  demoMode?: boolean;
   quest: QuestFeedItem;
 }) {
   const now = new Date().toISOString();
   const location = params.currentLocation;
+  if (params.demoMode) {
+    const distanceMeters = location
+      ? distanceBetweenMeters(location, params.quest)
+      : null;
+
+    return {
+      checkinId: makeLocalId("checkin"),
+      checkedInAt: now,
+      distanceMeters: distanceMeters ? Math.round(distanceMeters) : null,
+      mockVerified: true,
+      radiusMeters: params.quest.radius_meters,
+    };
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase) {
@@ -492,8 +519,21 @@ export async function checkInQuest(params: {
   };
 }
 
-export async function completeQuest(params: { quest: QuestFeedItem }) {
+export async function completeQuest(params: {
+  demoMode?: boolean;
+  quest: QuestFeedItem;
+}) {
   const now = new Date().toISOString();
+  if (params.demoMode) {
+    return {
+      acceptedId: makeLocalId("accept"),
+      checkinId: makeLocalId("checkin"),
+      completedAt: now,
+      completionId: makeLocalId("complete"),
+      xpAwarded: params.quest.xp_reward,
+    };
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase) {
@@ -525,7 +565,14 @@ export async function completeQuest(params: { quest: QuestFeedItem }) {
   };
 }
 
-export async function hideSponsoredQuest(params: { questId: string }) {
+export async function hideSponsoredQuest(params: {
+  demoMode?: boolean;
+  questId: string;
+}) {
+  if (params.demoMode) {
+    return [];
+  }
+
   const supabase = getSupabaseClient() as any;
   const userId = await getCurrentSupabaseUserId();
 
@@ -544,7 +591,13 @@ export async function hideSponsoredQuest(params: { questId: string }) {
   return [];
 }
 
-export async function resetHiddenSponsoredQuests() {
+export async function resetHiddenSponsoredQuests(params?: {
+  demoMode?: boolean;
+}) {
+  if (params?.demoMode) {
+    return 0;
+  }
+
   const supabase = getSupabaseClient() as any;
   const userId = await getCurrentSupabaseUserId();
 

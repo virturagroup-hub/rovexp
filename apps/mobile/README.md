@@ -77,7 +77,7 @@ corepack pnpm --filter @rovexp/mobile ios
 - `EXPO_PUBLIC_DEFAULT_STATE_CODE` - fallback state code for the seeded quest area
 - `rovexp://auth/callback` - Expo deep-link redirect used by Supabase OAuth sessions
 
-When the Supabase values are blank, the app falls back to typed mock data for local UI development. When Supabase is configured but the backend is missing schema, buckets, or policies, the app keeps running with fallback data but exposes that state clearly in the UI and developer console.
+When the Supabase values are blank, the app falls back to typed mock data for local UI development. When Supabase is configured but the backend is missing schema, buckets, or policies, the app keeps running with fallback data but exposes that state clearly in the UI and developer console. Skip-login demo mode intentionally pins the quest board to the curated Chicago demo dataset so Home, Quests, Map, and reviews stay showcase-ready even if the live backend is empty.
 
 ## Notes
 

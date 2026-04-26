@@ -54,8 +54,13 @@ export async function listStates(): Promise<StateRecord[]> {
 }
 
 export async function getProfileSummary(params: {
+  demoMode?: boolean;
   userId: string | null;
 }): Promise<ProfileSummary> {
+  if (params.demoMode) {
+    return demoProfileSummary;
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase && params.userId) {
@@ -160,9 +165,14 @@ export async function getProfileSummary(params: {
 }
 
 export async function updateProfile(params: {
+  demoMode?: boolean;
   userId: string;
   values: ProfileFormInput;
 }) {
+  if (params.demoMode) {
+    return;
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (!supabase) {
@@ -185,9 +195,14 @@ export async function updateProfile(params: {
 }
 
 export async function saveUserSettings(params: {
+  demoMode?: boolean;
   userId: string;
   values: SettingsFormInput;
 }) {
+  if (params.demoMode) {
+    return;
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (!supabase) {

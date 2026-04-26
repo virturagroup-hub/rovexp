@@ -36,26 +36,38 @@ import {
 } from "@/services/friends";
 import { getQuestReviews, submitReview } from "@/services/reviews";
 import { useAppStore } from "@/store/app-store";
+import { mobileEnv } from "@/lib/env";
 
 export function useQuestFeedQuery() {
+  const authMode = useAppStore((state) => state.authMode);
   const preferredRadiusMiles = useAppStore((state) => state.preferredRadiusMiles);
   const lastKnownLocation = useAppStore((state) => state.lastKnownLocation);
   const questFilters = useAppStore((state) => state.questFilters);
   const userId = useAppStore((state) => state.userId);
+  const demoLocationKey =
+    authMode === "demo"
+      ? {
+          latitude: mobileEnv.defaultLatitude,
+          longitude: mobileEnv.defaultLongitude,
+          stateCode: mobileEnv.defaultStateCode,
+        }
+      : null;
 
   return useQuery({
     queryKey: [
       "quest-feed",
+      authMode,
       userId,
       preferredRadiusMiles,
-      lastKnownLocation?.latitude,
-      lastKnownLocation?.longitude,
-      lastKnownLocation?.stateCode,
+      demoLocationKey?.latitude ?? lastKnownLocation?.latitude,
+      demoLocationKey?.longitude ?? lastKnownLocation?.longitude,
+      demoLocationKey?.stateCode ?? lastKnownLocation?.stateCode,
       questFilters,
     ],
     queryFn: () =>
       getQuestFeed({
         filters: questFilters,
+        demoMode: authMode === "demo",
         location: lastKnownLocation,
         radiusMiles: preferredRadiusMiles,
       }),
@@ -63,23 +75,26 @@ export function useQuestFeedQuery() {
 }
 
 export function useQuestProgressQuery() {
+  const authMode = useAppStore((state) => state.authMode);
   const userId = useAppStore((state) => state.userId);
 
   return useQuery({
     enabled: Boolean(userId),
-    queryKey: ["quest-progress", userId],
-    queryFn: getQuestProgressSnapshot,
+    queryKey: ["quest-progress", authMode, userId],
+    queryFn: () => getQuestProgressSnapshot({ demoMode: authMode === "demo" }),
   });
 }
 
 export function useProfileSummaryQuery() {
+  const authMode = useAppStore((state) => state.authMode);
   const userId = useAppStore((state) => state.userId);
 
   return useQuery({
     enabled: Boolean(userId),
-    queryKey: ["profile-summary", userId],
+    queryKey: ["profile-summary", authMode, userId],
     queryFn: () =>
       getProfileSummary({
+        demoMode: authMode === "demo",
         userId,
       }),
   });
@@ -93,24 +108,34 @@ export function useStatesQuery() {
 }
 
 export function useQuestReviewsQuery(questId: string | null) {
+  const authMode = useAppStore((state) => state.authMode);
   return useQuery({
     enabled: Boolean(questId),
-    queryKey: ["quest-reviews", questId],
-    queryFn: () => getQuestReviews(questId ?? ""),
+    queryKey: ["quest-reviews", authMode, questId],
+    queryFn: () =>
+      getQuestReviews(questId ?? "", {
+        demoMode: authMode === "demo",
+      }),
   });
 }
 
 export function useQuestCategoriesQuery() {
+  const authMode = useAppStore((state) => state.authMode);
   return useQuery({
-    queryKey: ["quest-categories"],
-    queryFn: getQuestCategories,
+    queryKey: ["quest-categories", authMode],
+    queryFn: () => getQuestCategories({ demoMode: authMode === "demo" }),
   });
 }
 
 export function useLeaderboardQuery(stateId: string | null) {
+  const authMode = useAppStore((state) => state.authMode);
   return useQuery({
-    queryKey: ["leaderboards", stateId],
-    queryFn: () => getLeaderboardSnapshot({ stateId }),
+    queryKey: ["leaderboards", authMode, stateId],
+    queryFn: () =>
+      getLeaderboardSnapshot({
+        demoMode: authMode === "demo",
+        stateId,
+      }),
   });
 }
 
@@ -147,6 +172,7 @@ export function useFriendActivityQuery() {
 
 export function useProfileMutations() {
   const queryClient = useQueryClient();
+  const authMode = useAppStore((state) => state.authMode);
   const userId = useAppStore((state) => state.userId);
   const locationPermission = useAppStore((state) => state.locationPermission);
   const cameraPermission = useAppStore((state) => state.cameraPermission);
@@ -158,7 +184,7 @@ export function useProfileMutations() {
         throw new Error("You need to be signed in to update your profile.");
       }
 
-      return updateProfile({ userId, values });
+      return updateProfile({ demoMode: authMode === "demo", userId, values });
     },
     onSuccess: async () => {
       if (!userId) {
@@ -167,7 +193,7 @@ export function useProfileMutations() {
 
       const summary = await getProfileSummary({ userId });
       syncProfileSummary(summary);
-      await queryClient.invalidateQueries({ queryKey: ["profile-summary", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["profile-summary"] });
       await queryClient.invalidateQueries({ queryKey: ["leaderboards"] });
     },
   });
@@ -179,6 +205,7 @@ export function useProfileMutations() {
       }
 
       return saveUserSettings({
+        demoMode: authMode === "demo",
         userId,
         values: {
           ...values,
@@ -194,7 +221,7 @@ export function useProfileMutations() {
 
       const summary = await getProfileSummary({ userId });
       syncProfileSummary(summary);
-      await queryClient.invalidateQueries({ queryKey: ["profile-summary", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["profile-summary"] });
       await queryClient.invalidateQueries({ queryKey: ["quest-feed"] });
       await queryClient.invalidateQueries({ queryKey: ["leaderboards"] });
     },
@@ -208,13 +235,15 @@ export function useProfileMutations() {
 
 export function useQuestFlowMutations() {
   const queryClient = useQueryClient();
+  const authMode = useAppStore((state) => state.authMode);
   const acceptQuestInStore = useAppStore((state) => state.acceptQuest);
   const checkInQuestInStore = useAppStore((state) => state.checkInQuest);
   const completeQuestInStore = useAppStore((state) => state.completeQuest);
   const recordReview = useAppStore((state) => state.recordReview);
 
   const acceptMutation = useMutation({
-    mutationFn: (quest: QuestFeedItem) => acceptQuest({ questId: quest.id }),
+    mutationFn: (quest: QuestFeedItem) =>
+      acceptQuest({ demoMode: authMode === "demo", questId: quest.id }),
     onSuccess: async (result, quest) => {
       acceptQuestInStore({
         acceptedAt: result.acceptedAt,
@@ -231,7 +260,11 @@ export function useQuestFlowMutations() {
       allowMockVerification: boolean;
       currentLocation: { latitude: number; longitude: number } | null;
       quest: QuestFeedItem;
-    }) => checkInQuest(params),
+    }) =>
+      checkInQuest({
+        ...params,
+        demoMode: authMode === "demo",
+      }),
     onSuccess: async (result, variables) => {
       checkInQuestInStore({
         checkedInAt: result.checkedInAt,
@@ -244,7 +277,8 @@ export function useQuestFlowMutations() {
   });
 
   const completeMutation = useMutation({
-    mutationFn: (params: { quest: QuestFeedItem }) => completeQuest(params),
+    mutationFn: (params: { quest: QuestFeedItem }) =>
+      completeQuest({ ...params, demoMode: authMode === "demo" }),
     onSuccess: async (result, variables) => {
       completeQuestInStore({
         completedAt: result.completedAt,
@@ -281,9 +315,7 @@ export function useQuestFlowMutations() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["leaderboards"] }),
         queryClient.invalidateQueries({ queryKey: ["profile-summary"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["quest-reviews", variables.questId],
-        }),
+        queryClient.invalidateQueries({ queryKey: ["quest-reviews"] }),
         queryClient.invalidateQueries({ queryKey: ["quest-progress"] }),
       ]);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -357,20 +389,19 @@ export function useFriendMutations() {
 
 export function useQuestVisibilityMutations() {
   const queryClient = useQueryClient();
-  const userId = useAppStore((state) => state.userId);
+  const authMode = useAppStore((state) => state.authMode);
 
   const hideSponsoredMutation = useMutation({
-    mutationFn: (questId: string) => hideSponsoredQuest({ questId }),
+    mutationFn: (questId: string) =>
+      hideSponsoredQuest({ demoMode: authMode === "demo", questId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["quest-feed", userId] });
       await queryClient.invalidateQueries({ queryKey: ["quest-feed"] });
     },
   });
 
   const resetHiddenSponsoredMutation = useMutation({
-    mutationFn: resetHiddenSponsoredQuests,
+    mutationFn: () => resetHiddenSponsoredQuests({ demoMode: authMode === "demo" }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["quest-feed", userId] });
       await queryClient.invalidateQueries({ queryKey: ["quest-feed"] });
     },
   });

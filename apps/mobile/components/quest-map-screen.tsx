@@ -20,6 +20,8 @@ function dedupeById<T extends { id: string }>(items: T[]) {
 }
 
 export default function QuestMapScreen() {
+  const authMode = useAppStore((state) => state.authMode);
+  const demoMode = authMode === "demo";
   const questProgress = useAppStore((state) => state.questProgress);
   const lastKnownLocation = useAppStore((state) => state.lastKnownLocation);
   const locationPermission = useAppStore((state) => state.locationPermission);
@@ -45,8 +47,14 @@ export default function QuestMapScreen() {
       null,
     [selectedQuestId, selectionPool],
   );
-  const centerLatitude = lastKnownLocation?.latitude ?? mobileEnv.defaultLatitude;
-  const centerLongitude = lastKnownLocation?.longitude ?? mobileEnv.defaultLongitude;
+  const centerLatitude = demoMode
+    ? mobileEnv.defaultLatitude
+    : lastKnownLocation?.latitude ?? mobileEnv.defaultLatitude;
+  const centerLongitude = demoMode
+    ? mobileEnv.defaultLongitude
+    : lastKnownLocation?.longitude ?? mobileEnv.defaultLongitude;
+  const usingFallbackLocation =
+    data?.usingFallbackLocation ?? (demoMode || !lastKnownLocation);
 
   return (
     <QuestMapSurface
@@ -63,7 +71,7 @@ export default function QuestMapScreen() {
       selectedQuest={selectedQuest}
       setSelectedQuestId={setSelectedQuestId}
       sponsoredQuests={sponsoredQuests}
-      usingFallbackLocation={data?.usingFallbackLocation ?? !lastKnownLocation}
+      usingFallbackLocation={usingFallbackLocation}
       visibleQuests={visibleQuests}
     />
   );

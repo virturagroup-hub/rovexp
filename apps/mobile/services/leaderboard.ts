@@ -27,12 +27,40 @@ function mapLeaderboardRows(rows: any[] | null | undefined): LeaderboardEntry[] 
 }
 
 export async function getLeaderboardSnapshot(params: {
+  demoMode?: boolean;
   stateId: string | null;
 }): Promise<{
   friends: LeaderboardCollection;
   state: LeaderboardCollection;
   weekly: LeaderboardCollection;
 }> {
+  if (params.demoMode) {
+    return {
+      friends: {
+        empty_message:
+          "Accepted friends will appear here once your social graph starts filling in.",
+        entries: demoLeaderboard.slice(0, 2),
+        scope: "friends",
+      },
+      state: {
+        empty_message:
+          "Complete a quest in your selected state to start this ranking ladder.",
+        entries: demoLeaderboard,
+        scope: "state",
+      },
+      weekly: {
+        empty_message:
+          "Weekly movement appears here once fresh quest completions land this week.",
+        entries: demoLeaderboard.slice(0, 3).map((entry, index) => ({
+          ...entry,
+          rank: index + 1,
+          xp_total: Math.round(entry.xp_total * 0.28),
+        })),
+        scope: "weekly",
+      },
+    };
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase) {

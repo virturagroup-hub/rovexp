@@ -1,4 +1,8 @@
-export type SupabaseRuntimeSource = "live" | "fallback-env" | "fallback-backend";
+export type SupabaseRuntimeSource =
+  | "live"
+  | "demo"
+  | "fallback-env"
+  | "fallback-backend";
 
 const warnedContexts = new Set<string>();
 
@@ -11,6 +15,12 @@ export function describeSupabaseRuntimeSource(
       return {
         body: "Connected to the live Supabase project.",
         label: "Live Supabase",
+        tone: "good" as const,
+      };
+    case "demo":
+      return {
+        body: "Curated demo quests are loaded so the showcase stays full and interactive.",
+        label: "Demo quest board",
         tone: "good" as const,
       };
     case "fallback-env":

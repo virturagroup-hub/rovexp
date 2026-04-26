@@ -68,6 +68,7 @@ cp apps/admin/.env.example apps/admin/.env.local
 - mobile also uses `EXPO_PUBLIC_DEFAULT_AREA_LABEL`, `EXPO_PUBLIC_DEFAULT_LATITUDE`, `EXPO_PUBLIC_DEFAULT_LONGITUDE`, and `EXPO_PUBLIC_DEFAULT_STATE_CODE`
 - admin uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - admin can optionally use `ADMIN_DEMO_ENABLED` to expose the showcase walkthrough entry
+- admin also exposes a dedicated `/showcase` route inside the admin portal for judges/testers
 
 `apps/mobile/.env` is intentionally local-only; the checked-in template lives at `apps/mobile/.env.example`.
 
@@ -161,6 +162,7 @@ RoveXP is intended to be easy to hand to judges, testers, and collaborators:
 - the mobile app supports a clear demo mode when login is skipped
 - the admin dashboard is meant for private deployment on Vercel
 - the admin portal can expose a clearly labeled demo walkthrough mode for showcase use
+- the admin portal includes a dedicated `/showcase` route that explains the product story
 - mobile showcase builds are expected to ship through Expo / EAS
 - live mode uses Supabase, while demo mode keeps the app usable without trapping the user
 

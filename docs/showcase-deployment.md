@@ -37,7 +37,8 @@ supabase db reset
 ## Admin on Vercel
 
 The admin dashboard is designed to be deployed as a standalone private/internal Vercel app.
-It includes a dedicated map explorer at `/dashboard/places/map` for place discovery and quest seeding.
+It includes a dedicated map explorer at `/dashboard/places/map` for place discovery and quest seeding
+and a guided showcase route at `/showcase` for judges and testers.
 
 Recommended setup:
 
@@ -50,6 +51,7 @@ Recommended setup:
 4. Use the default Next.js build command for the admin app.
 5. Keep access limited to approved internal users.
 6. Promote admin accounts in `public.admin_users` after creating their Supabase Auth users.
+7. Share `/showcase` from the dashboard sidebar or use the `/showcase` route directly after sign-in.
 
 Helpful commands:
 
@@ -128,5 +130,6 @@ Provide these to judges/testers:
 
 - GitHub repository URL
 - Admin Vercel URL
+- Admin showcase route (`/showcase`)
 - Android internal build link or APK/AAB path
 - iOS TestFlight link

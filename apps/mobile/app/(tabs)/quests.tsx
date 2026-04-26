@@ -10,6 +10,7 @@ import { EmptyStateCard, ScreenHeader, SectionHeader, ScreenView } from "@/compo
 import { theme } from "@/constants/theme";
 import { tabBarLayout } from "@/constants/navigation";
 import { useQuestFeedQuery, useQuestFlowMutations } from "@/hooks/use-rovexp-data";
+import { mobileEnv } from "@/lib/env";
 import type { QuestFeedItem } from "@/services/quests";
 import { useAppStore } from "@/store/app-store";
 
@@ -33,6 +34,8 @@ function toggleValue<T extends string>(values: T[], value: T) {
 }
 
 export default function QuestsScreen() {
+  const authMode = useAppStore((state) => state.authMode);
+  const demoMode = authMode === "demo";
   const questProgress = useAppStore((state) => state.questProgress);
   const questFilters = useAppStore((state) => state.questFilters);
   const setQuestFilters = useAppStore((state) => state.setQuestFilters);
@@ -43,6 +46,15 @@ export default function QuestsScreen() {
     useQuestFlowMutations();
   const [sortMode, setSortMode] =
     useState<(typeof sortOptions)[number]["value"]>("distance");
+  const activeLocation = demoMode
+    ? {
+        areaLabel: mobileEnv.defaultAreaLabel,
+        latitude: mobileEnv.defaultLatitude,
+        longitude: mobileEnv.defaultLongitude,
+        stateCode: mobileEnv.defaultStateCode,
+        verified: true,
+      }
+    : lastKnownLocation;
 
   const allQuests = useMemo(() => {
     const catalog = data?.all ?? [...(data?.sponsored ?? []), ...(data?.nearby ?? [])];
@@ -86,8 +98,10 @@ export default function QuestsScreen() {
     try {
       await checkInMutation.mutateAsync({
         allowMockVerification:
-          locationPermission !== "granted" || !lastKnownLocation?.verified,
-        currentLocation: lastKnownLocation,
+          demoMode ||
+          locationPermission !== "granted" ||
+          !lastKnownLocation?.verified,
+        currentLocation: activeLocation,
         quest,
       });
     } catch (error) {
@@ -309,7 +323,7 @@ export default function QuestsScreen() {
             inProgress.map((quest) => (
               <QuestCard
                 key={quest.id}
-                currentLocation={lastKnownLocation}
+                currentLocation={activeLocation}
                 isBusy={
                   acceptMutation.isPending ||
                   checkInMutation.isPending ||
@@ -341,7 +355,7 @@ export default function QuestsScreen() {
             allQuests.map((quest) => (
               <QuestCard
                 key={quest.id}
-                currentLocation={lastKnownLocation}
+                currentLocation={activeLocation}
                 isBusy={
                   acceptMutation.isPending ||
                   checkInMutation.isPending ||

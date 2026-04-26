@@ -28,7 +28,16 @@ async function createSignedPhotoUrls(photoPaths: string[]) {
   return signed.filter(Boolean) as string[];
 }
 
-export async function getQuestReviews(questId: string): Promise<QuestReview[]> {
+export async function getQuestReviews(
+  questId: string,
+  params?: {
+    demoMode?: boolean;
+  },
+): Promise<QuestReview[]> {
+  if (params?.demoMode) {
+    return demoQuestReviews[questId] ?? [];
+  }
+
   const supabase = getSupabaseClient() as any;
 
   if (supabase) {

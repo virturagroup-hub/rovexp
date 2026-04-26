@@ -196,6 +196,7 @@ function QuestRail({
 
 export default function HomeScreen() {
   const authMode = useAppStore((state) => state.authMode);
+  const demoMode = authMode === "demo";
   const displayName = useAppStore((state) => state.displayName);
   const preferredRadiusMiles = useAppStore((state) => state.preferredRadiusMiles);
   const questFilters = useAppStore((state) => state.questFilters);
@@ -210,6 +211,14 @@ export default function HomeScreen() {
     useQuestFlowMutations();
   const { hideSponsoredMutation } = useQuestVisibilityMutations();
   const { width } = useWindowDimensions();
+  const demoLocation = {
+    areaLabel: mobileEnv.defaultAreaLabel,
+    latitude: mobileEnv.defaultLatitude,
+    longitude: mobileEnv.defaultLongitude,
+    stateCode: mobileEnv.defaultStateCode,
+    verified: true,
+  };
+  const activeLocation = demoMode ? demoLocation : lastKnownLocation;
 
   useEffect(() => {
     let cancelled = false;
@@ -295,8 +304,10 @@ export default function HomeScreen() {
     try {
       const result = await checkInMutation.mutateAsync({
         allowMockVerification:
-          locationPermission !== "granted" || !lastKnownLocation?.verified,
-        currentLocation: lastKnownLocation,
+          demoMode ||
+          locationPermission !== "granted" ||
+          !lastKnownLocation?.verified,
+        currentLocation: activeLocation,
         quest,
       });
 
@@ -388,7 +399,9 @@ export default function HomeScreen() {
             {data?.areaLabel ?? lastKnownLocation?.areaLabel ?? mobileEnv.defaultAreaLabel}
           </Text>
           <Text style={styles.heroBody}>
-            {data?.usingFallbackLocation
+            {data?.runtimeSource === "demo"
+              ? "Curated demo quests are anchored to Downtown Chicago so the showcase always stays full."
+              : data?.usingFallbackLocation
               ? "Using the fallback exploration district until live location is available."
               : "Live location is shaping your nearby quest board."}
           </Text>
@@ -452,7 +465,7 @@ export default function HomeScreen() {
         <QuestRail
           actionLabel="Tune filters"
           compact={false}
-          currentLocation={lastKnownLocation}
+          currentLocation={activeLocation}
           emptySubtitle="As sponsor inventory grows, the closest placements will appear here first."
           emptyTitle="No sponsored quests in range"
           isLoading={isLoading}
@@ -473,7 +486,7 @@ export default function HomeScreen() {
         <QuestRail
           actionLabel="Open board"
           compact
-          currentLocation={lastKnownLocation}
+          currentLocation={activeLocation}
           emptySubtitle="Try widening the radius or adjusting your saved quest filters from Settings."
           emptyTitle="Nothing nearby yet"
           isLoading={isLoading}
