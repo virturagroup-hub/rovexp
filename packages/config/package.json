@@ -1,0 +1,10 @@
+{
+  "name": "@rovexp/config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./typescript/base": "./typescript/base.json",
+    "./typescript/next": "./typescript/next.json",
+    "./typescript/expo": "./typescript/expo.json"
+  }
+}

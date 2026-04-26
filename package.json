@@ -1,0 +1,36 @@
+{
+  "name": "rovexp",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "turbo run clean",
+    "dev": "turbo run dev --parallel",
+    "dev:admin": "pnpm --filter @rovexp/admin dev",
+    "dev:mobile": "pnpm --filter @rovexp/mobile start",
+    "dev:mobile:android": "pnpm --filter @rovexp/mobile android",
+    "dev:mobile:ios": "pnpm --filter @rovexp/mobile ios",
+    "db:reset": "supabase db reset",
+    "db:start": "supabase start",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.1.0",
+      "@types/react-dom": "19.1.0",
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
+    }
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.8.4",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.1"
+  }
+}
