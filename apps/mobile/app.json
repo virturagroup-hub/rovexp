@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "RoveXP",
+    "slug": "rovexp-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "rovexp",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1830"
+    },
+    "ios": {
+      "bundleIdentifier": "com.rovexp.mobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "RoveXP uses your location to surface nearby quests and verify on-site check-ins.",
+        "NSCameraUsageDescription": "RoveXP uses your camera so you can attach proof photos to completed quest reviews.",
+        "NSPhotoLibraryUsageDescription": "RoveXP lets you attach optional photos when you review a completed quest."
+      }
+    },
+    "android": {
+      "package": "com.rovexp.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#123A63"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "RoveXP uses your location to surface nearby quests and verify on-site check-ins."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "RoveXP uses your camera so you can attach proof photos to completed quest reviews.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RoveXP lets you attach optional photos when you review a completed quest."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,102 @@
+# RoveXP Admin
+
+Private internal dashboard for operating quests, sponsors, rewards, titles, badges, reviews, and explorer visibility.
+
+## Stack
+
+- Next.js App Router
+- TypeScript
+- Tailwind CSS v4
+- shadcn/ui
+- Supabase SSR
+
+## Routes
+
+- `/login`
+- `/dashboard`
+- `/dashboard/sponsors`
+- `/dashboard/places`
+- `/dashboard/places/nearby`
+- `/dashboard/candidates`
+- `/dashboard/quests`
+- `/dashboard/rewards`
+- `/dashboard/titles`
+- `/dashboard/badges`
+- `/dashboard/reviews`
+- `/dashboard/users`
+
+## Setup
+
+1. Install dependencies from the repo root:
+
+```bash
+corepack pnpm install
+```
+
+2. Copy envs:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Fill in `apps/admin/.env.local` with the real Supabase project URL and publishable key.
+
+4. Start the app:
+
+```bash
+corepack pnpm --filter @rovexp/admin dev
+```
+
+4. Open `http://localhost:3000`.
+
+## Environment Variables
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback only)
+
+## Auth
+
+The admin dashboard now requires real Supabase auth:
+
+- users sign in with email/password through Supabase
+- dashboard access is restricted to users present in `public.admin_users`
+- authenticated non-admin users are redirected out of the dashboard
+
+Promote admins after creating the auth user:
+
+```sql
+insert into public.admin_users (user_id, role)
+values ('replace-with-auth-user-uuid', 'owner')
+on conflict (user_id) do update set role = excluded.role;
+```
+
+## Vercel Deployment
+
+This app is intended for a private/internal deployment on Vercel.
+
+Recommended setup:
+
+1. Create a Vercel project pointing at `apps/admin`.
+2. Set the root directory to `apps/admin` if you are linking from the monorepo root.
+3. Add the `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` environment variables.
+4. Pull the envs locally with `vercel env pull .env.local --yes` if you want a matching local `.env.local`.
+5. Restrict access at the org/app level as needed because this dashboard is private/internal only.
+6. Promote the allowed admin accounts in `public.admin_users`.
+
+The admin dashboard is safe to deploy on a custom domain or the standard Vercel URL as long as only approved `admin_users` rows exist in Supabase.
+
+## Content Pipeline
+
+The internal control room now supports a place-to-quest workflow:
+
+1. create or import `places`
+2. open `/dashboard/places/nearby` to preview a target area
+3. bulk-generate `quest_candidates` from nearby stored places
+4. review and edit the candidate
+5. publish the approved candidate into a live quest
+
+That keeps humans in control while still giving the team a repeatable way to seed nearby content.
+Duplicate places, inactive rows, private venues, and already-published sources are skipped automatically during the nearby bulk generator.
+Nearby matching uses the stored place coordinates plus the admin-entered radius and filters; it is intentionally simple and easy to upgrade later if the place corpus grows.
+Generated candidates now carry structured generation notes so reviewers can see the source place, vibe, title/description pattern, rarity rationale, and XP logic without digging through raw JSON.
