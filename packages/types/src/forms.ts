@@ -39,6 +39,7 @@ export const placeFormSchema = z.object({
   external_id: z.string().max(120).optional().or(z.literal("")),
   name: z.string().min(2).max(160),
   description: z.string().max(600).optional().or(z.literal("")),
+  public_description: z.string().max(600).optional().or(z.literal("")),
   place_type: z.string().min(2).max(80),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
