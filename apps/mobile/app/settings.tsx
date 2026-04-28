@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ActionButton, ScreenHeader, ScreenView } from "@/components/ui";
 import { theme } from "@/constants/theme";
+import { captureCurrentLocationSnapshot } from "@/lib/location";
 import { describeLocationStatus } from "@/lib/location-status";
 import {
   useProfileMutations,
@@ -54,7 +55,21 @@ export default function SettingsScreen() {
 
   const handleLocationRetry = async () => {
     const response = await Location.requestForegroundPermissionsAsync();
-    setLocationPermission(response.status === "granted" ? "granted" : "denied");
+    const nextStatus = response.status === "granted" ? "granted" : "denied";
+
+    setLocationPermission(nextStatus);
+
+    if (nextStatus === "granted") {
+      try {
+        const snapshot = await captureCurrentLocationSnapshot();
+
+        if (snapshot) {
+          useAppStore.getState().setStoredLocation(snapshot);
+        }
+      } catch {
+        // Keep the existing location snapshot if live capture fails.
+      }
+    }
   };
 
   const handleCameraRetry = async () => {

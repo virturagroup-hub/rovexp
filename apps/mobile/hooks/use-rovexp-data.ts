@@ -44,6 +44,12 @@ export function useQuestFeedQuery() {
   const lastKnownLocation = useAppStore((state) => state.lastKnownLocation);
   const questFilters = useAppStore((state) => state.questFilters);
   const userId = useAppStore((state) => state.userId);
+  const liveLocation =
+    authMode === "demo"
+      ? null
+      : lastKnownLocation?.verified
+        ? lastKnownLocation
+        : null;
   const demoLocationKey =
     authMode === "demo"
       ? {
@@ -59,16 +65,16 @@ export function useQuestFeedQuery() {
       authMode,
       userId,
       preferredRadiusMiles,
-      demoLocationKey?.latitude ?? lastKnownLocation?.latitude,
-      demoLocationKey?.longitude ?? lastKnownLocation?.longitude,
-      demoLocationKey?.stateCode ?? lastKnownLocation?.stateCode,
+      demoLocationKey?.latitude ?? liveLocation?.latitude,
+      demoLocationKey?.longitude ?? liveLocation?.longitude,
+      demoLocationKey?.stateCode ?? liveLocation?.stateCode,
       questFilters,
     ],
     queryFn: () =>
       getQuestFeed({
         filters: questFilters,
         demoMode: authMode === "demo",
-        location: lastKnownLocation,
+        location: liveLocation,
         radiusMiles: preferredRadiusMiles,
       }),
   });

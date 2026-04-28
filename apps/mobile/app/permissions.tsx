@@ -14,6 +14,7 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { OnboardingShell } from "@/components/onboarding-shell";
 import { ActionButton } from "@/components/ui";
 import { theme } from "@/constants/theme";
+import { captureCurrentLocationSnapshot } from "@/lib/location";
 import { useAppStore } from "@/store/app-store";
 
 function statusLabel(status: "unknown" | "granted" | "denied") {
@@ -104,6 +105,16 @@ export default function PermissionsScreen() {
     setLocationPermission(nextStatus);
 
     if (nextStatus === "granted") {
+      try {
+        const snapshot = await captureCurrentLocationSnapshot();
+
+        if (snapshot) {
+          useAppStore.getState().setStoredLocation(snapshot);
+        }
+      } catch {
+        // Keep the fallback district if the live capture fails.
+      }
+
       setStep(1);
     }
   };

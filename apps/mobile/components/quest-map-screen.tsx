@@ -28,6 +28,11 @@ export default function QuestMapScreen() {
   const preferredRadiusMiles = useAppStore((state) => state.preferredRadiusMiles);
   const { data, isLoading } = useQuestFeedQuery();
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
+  const liveLocation = demoMode
+    ? null
+    : lastKnownLocation?.verified
+      ? lastKnownLocation
+      : null;
 
   const allQuests = data?.all ?? [];
   const nearbyQuests = data?.nearby ?? [];
@@ -49,17 +54,17 @@ export default function QuestMapScreen() {
   );
   const centerLatitude = demoMode
     ? mobileEnv.defaultLatitude
-    : lastKnownLocation?.latitude ?? mobileEnv.defaultLatitude;
+    : liveLocation?.latitude ?? mobileEnv.defaultLatitude;
   const centerLongitude = demoMode
     ? mobileEnv.defaultLongitude
-    : lastKnownLocation?.longitude ?? mobileEnv.defaultLongitude;
+    : liveLocation?.longitude ?? mobileEnv.defaultLongitude;
   const usingFallbackLocation =
-    data?.usingFallbackLocation ?? (demoMode || !lastKnownLocation);
+    data?.usingFallbackLocation ?? (demoMode || !liveLocation);
 
   return (
     <QuestMapSurface
       areaLabel={
-        data?.areaLabel ?? lastKnownLocation?.areaLabel ?? mobileEnv.defaultAreaLabel
+        data?.areaLabel ?? liveLocation?.areaLabel ?? mobileEnv.defaultAreaLabel
       }
       centerLatitude={centerLatitude}
       centerLongitude={centerLongitude}

@@ -37,6 +37,7 @@ export function QuestMapSurface({
   centerLongitude,
   isLoading,
   locationPermission,
+  usingFallbackLocation,
   questProgress,
   selectedQuest,
   setSelectedQuestId,
@@ -120,7 +121,9 @@ export function QuestMapSurface({
           <Text style={styles.mapTitle}>Nearby quest field</Text>
           <Text style={styles.mapBody}>
             {locationPermission === "granted"
-              ? "Your live position drives the map center and keeps the nearby board grounded in where you are right now."
+              ? usingFallbackLocation
+                ? "Location permission is on, but RoveXP is still resolving your live position. The fallback district is visible for now."
+                : "Your live position drives the map center and keeps the nearby board grounded in where you are right now."
               : "Location is unavailable, so the map is centered on the fallback exploration district until permission is restored."}
           </Text>
 
