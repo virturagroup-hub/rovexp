@@ -1,7 +1,16 @@
 import { router } from "expo-router";
+import Constants from "expo-constants";
 import { MapPin, Navigation } from "lucide-react-native";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsButton } from "@/components/settings-button";
 import {
@@ -13,6 +22,7 @@ import {
 } from "@/components/ui";
 import { tabBarLayout } from "@/constants/navigation";
 import { theme } from "@/constants/theme";
+import { mobileEnv } from "@/lib/env";
 import { formatDistanceMiles } from "@/lib/geo";
 
 import type { QuestMapSurfaceProps } from "./quest-map.types";
@@ -28,6 +38,66 @@ export function QuestMapSurface({
   setSelectedQuestId,
   visibleQuests,
 }: QuestMapSurfaceProps) {
+  const mapRef = useRef<MapView | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const mapMarkerQuests = useMemo(
+    () =>
+      visibleQuests.filter(
+        (quest) =>
+          Number.isFinite(quest.latitude) && Number.isFinite(quest.longitude),
+      ),
+    [visibleQuests],
+  );
+
+  useEffect(() => {
+    if (!mapReady || !mapMarkerQuests.length) {
+      return;
+    }
+
+    const handle = requestAnimationFrame(() => {
+      const coordinates = mapMarkerQuests.map((quest) => ({
+        latitude: quest.latitude,
+        longitude: quest.longitude,
+      }));
+
+      if (coordinates.length === 1) {
+        const [coordinate] = coordinates;
+
+        if (!coordinate) {
+          return;
+        }
+
+        mapRef.current?.animateToRegion(
+          {
+            latitude: coordinate.latitude,
+            latitudeDelta: 0.045,
+            longitude: coordinate.longitude,
+            longitudeDelta: 0.045,
+          },
+          500,
+        );
+        return;
+      }
+
+      mapRef.current?.fitToCoordinates(coordinates, {
+        animated: true,
+        edgePadding: {
+          bottom: 128,
+          left: 72,
+          right: 72,
+          top: 88,
+        },
+      });
+    });
+
+    return () => cancelAnimationFrame(handle);
+  }, [mapMarkerQuests, mapReady]);
+
+  const androidMapKeyReady =
+    Platform.OS !== "android" ||
+    Constants.executionEnvironment === "storeClient" ||
+    Boolean(mobileEnv.androidGoogleMapsApiKey);
+
   return (
     <ScreenView>
       <ScrollView
@@ -51,12 +121,24 @@ export function QuestMapSurface({
           </Text>
 
           <View style={styles.mapCanvas}>
-            {isLoading ? (
+            {!androidMapKeyReady ? (
+              <View style={styles.mapLoadingState}>
+                <Text style={styles.mapLoadingText}>
+                  Android map key not configured
+                </Text>
+                <Text style={styles.mapLoadingDetail}>
+                  Add EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY for standalone
+                  Android builds so the quest map can render.
+                </Text>
+              </View>
+            ) : isLoading ? (
               <View style={styles.mapLoadingState}>
                 <Text style={styles.mapLoadingText}>Loading quest markers...</Text>
               </View>
-            ) : visibleQuests.length ? (
+            ) : mapMarkerQuests.length ? (
               <MapView
+                onMapReady={() => setMapReady(true)}
+                ref={mapRef}
                 initialRegion={{
                   latitude: centerLatitude,
                   latitudeDelta: 0.075,
@@ -67,7 +149,7 @@ export function QuestMapSurface({
                 showsUserLocation={locationPermission === "granted"}
                 style={StyleSheet.absoluteFill}
               >
-                {visibleQuests.map((quest) => {
+                {mapMarkerQuests.map((quest) => {
                   const status = questProgress[quest.id]?.status ?? "available";
                   const pinColor =
                     status === "completed" || status === "reviewed"
@@ -220,10 +302,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     minHeight: 320,
+    paddingHorizontal: 20,
+  },
+  mapLoadingDetail: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+    textAlign: "center",
   },
   mapLoadingText: {
     color: theme.colors.muted,
     fontSize: 14,
+    textAlign: "center",
   },
   mapTitle: {
     color: theme.colors.ink,

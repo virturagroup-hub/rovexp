@@ -75,6 +75,7 @@ corepack pnpm --filter @rovexp/mobile ios
 - `EXPO_PUBLIC_DEFAULT_LATITUDE` - fallback latitude for the seeded exploration district
 - `EXPO_PUBLIC_DEFAULT_LONGITUDE` - fallback longitude for the seeded exploration district
 - `EXPO_PUBLIC_DEFAULT_STATE_CODE` - fallback state code for the seeded quest area
+- `EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY` - required for standalone Android builds that render the native quest map; Expo Go can render the map without it during local testing
 - `rovexp://auth/callback` - Expo deep-link redirect used by Supabase OAuth sessions
 
 When the Supabase values are blank, the app falls back to typed mock data for local UI development. When Supabase is configured but the backend is missing schema, buckets, or policies, the app keeps running with fallback data but exposes that state clearly in the UI and developer console. Skip-login demo mode intentionally pins the quest board to the curated Chicago demo dataset so Home, Quests, Map, and reviews stay showcase-ready even if the live backend is empty.
@@ -85,6 +86,7 @@ When the Supabase values are blank, the app falls back to typed mock data for lo
 - Location permission improves nearby quest relevance, map centering, and secure check-in validation.
 - Review photo upload is optional. The review can still save if the comment/rating succeeds but storage upload fails.
 - `react-native-maps` is included for the Phase 2 quest map experience.
+- Standalone Android builds need `EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY` so the native map can render tiles and markers.
 - Public leaderboard/profile surfaces use `username` handles, while `display_name` stays friend-visible.
 - The Friends screen includes copy/share friend codes and add-by-code invites backed by Supabase.
 
@@ -112,6 +114,7 @@ The skip-login path still enters demo mode, which is the intended showcase fallb
 Manual steps outside the repo:
 
 - create or link the Expo project before running the first build
+- set `EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY` in the EAS build environment if you want standalone Android builds to render the native quest map
 - register the iOS bundle identifier in the Apple Developer account
 - register the Android package name in Google Play Console if you plan to ship beyond internal distribution
 - enable any OAuth providers you actually want to use in Supabase Auth

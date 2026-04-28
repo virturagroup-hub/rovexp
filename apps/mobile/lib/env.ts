@@ -1,4 +1,6 @@
 export const mobileEnv = {
+  androidGoogleMapsApiKey:
+    process.env.EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY ?? "",
   oauthAppleEnabled: readBooleanEnv(process.env.EXPO_PUBLIC_OAUTH_APPLE_ENABLED),
   oauthFacebookEnabled: readBooleanEnv(
     process.env.EXPO_PUBLIC_OAUTH_FACEBOOK_ENABLED,
