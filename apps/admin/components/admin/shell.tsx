@@ -7,6 +7,7 @@ import {
 import type { AdminSession } from "@/lib/admin/auth";
 import { signOutAction } from "@/lib/admin/actions";
 
+import { MobileAdminNav } from "./mobile-admin-nav";
 import { SidebarNav } from "./sidebar-nav";
 
 const navigation = [
@@ -88,9 +89,45 @@ export function AdminShell({ children, user, mode }: AdminShellProps) {
   const isDemoMode = mode === "demo";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.25),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.14),_transparent_28%),linear-gradient(180deg,_#f5f7fb_0%,_#edf2f7_100%)]">
-      <div className="mx-auto grid min-h-screen max-w-[1600px] gap-6 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-6">
-        <aside className="flex flex-col rounded-[2rem] border border-white/70 bg-white/72 p-5 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.25),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(251,146,60,0.14),_transparent_28%),linear-gradient(180deg,_#f5f7fb_0%,_#edf2f7_100%)]">
+      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-4 px-3 py-3 sm:px-4 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:gap-6 lg:px-6 lg:py-4">
+        <div className="lg:hidden">
+          <div className="rounded-[1.75rem] border border-white/70 bg-white/82 px-4 py-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                  <Medal className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display text-lg font-semibold tracking-tight text-slate-950">
+                    RoveXP
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Internal adventure operations
+                  </p>
+                </div>
+              </Link>
+
+              <div className="flex items-center gap-2">
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                  {isDemoMode ? "Demo" : "Live"}
+                </div>
+                <MobileAdminNav items={[...navigation]} mode={mode} user={user} />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                Phase 2 Control Room
+              </p>
+              <p className="mt-2 font-display text-2xl font-semibold tracking-tight text-slate-950">
+                Explore the city. Run the system.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <aside className="hidden flex-col rounded-[2rem] border border-white/70 bg-white/72 p-5 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur lg:flex">
           <Link href="/dashboard" className="rounded-3xl bg-slate-950 px-5 py-5 text-white">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-2xl bg-white/10">
@@ -157,8 +194,8 @@ export function AdminShell({ children, user, mode }: AdminShellProps) {
           </form>
         </aside>
 
-        <div className="flex min-h-full flex-col gap-6">
-          <header className="rounded-[2rem] border border-white/70 bg-white/78 px-6 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] backdrop-blur">
+        <div className="flex min-h-full min-w-0 flex-col gap-4 lg:gap-6">
+          <header className="hidden rounded-[2rem] border border-white/70 bg-white/78 px-6 py-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)] backdrop-blur lg:block">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
@@ -179,7 +216,7 @@ export function AdminShell({ children, user, mode }: AdminShellProps) {
             </div>
           </header>
 
-          <main className="flex-1">{children}</main>
+          <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
     </div>

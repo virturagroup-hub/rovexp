@@ -27,7 +27,7 @@ export default async function ShowcasePage() {
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                 Guided demo inside the admin site
               </p>
-              <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
                 A polished walkthrough of the mobile product and the ops workflow.
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-slate-600">
@@ -38,12 +38,16 @@ export default async function ShowcasePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button asChild variant="outline" className="border-slate-300 bg-white">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full border-slate-300 bg-white sm:w-auto"
+            >
               <Link href="/dashboard">Back to dashboard</Link>
             </Button>
             <form action={signOutAction}>
-              <Button type="submit" variant="secondary">
+              <Button type="submit" variant="secondary" className="w-full sm:w-auto">
                 {session.mode === "demo" ? "Exit demo" : "Sign out"}
               </Button>
             </form>

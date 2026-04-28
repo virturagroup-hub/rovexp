@@ -9,6 +9,8 @@ Thumbs.db
 .env.local
 .env.*.local
 *.tsbuildinfo
+package-lock.json
+npm-shrinkwrap.json
 
 dist
 build

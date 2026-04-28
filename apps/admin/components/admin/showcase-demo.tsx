@@ -353,9 +353,54 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
     </div>
   );
 
+  const compactStepNav = (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {steps.map((step, index) => {
+        const active = activeStep === index;
+
+        return (
+          <button
+            key={step.id}
+            type="button"
+            onClick={() => scrollToSection(index)}
+            aria-current={active ? "step" : undefined}
+            className={cn(
+              "flex min-w-[9rem] flex-none items-center gap-2 rounded-2xl border px-3 py-2 text-left transition",
+              active
+                ? "border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/10"
+                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-200 hover:bg-white",
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-xl text-xs font-semibold",
+                active ? "bg-white/10 text-white" : "bg-white text-slate-700",
+              )}
+            >
+              {index + 1}
+            </span>
+            <span className="block min-w-0">
+              <span className="block truncate text-xs font-semibold">
+                {step.label}
+              </span>
+              <span
+                className={cn(
+                  "block truncate text-[11px] leading-4",
+                  active ? "text-white/70" : "text-slate-500",
+                )}
+              >
+                {step.body}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="space-y-4 xl:sticky xl:top-8 xl:max-h-[calc(100vh-4rem)] xl:self-start xl:overflow-y-auto xl:pr-1">
+    <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="hidden space-y-4 xl:sticky xl:top-8 xl:block xl:max-h-[calc(100vh-4rem)] xl:self-start xl:overflow-y-auto xl:pr-1">
         <Card className="rounded-[2rem] border-slate-200/80 bg-white/88 shadow-[0_18px_52px_rgba(15,23,42,0.08)] backdrop-blur">
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
@@ -466,6 +511,62 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
       </aside>
 
       <div className="space-y-6">
+        <div className="xl:hidden">
+          <Card className="rounded-[2rem] border-slate-200/80 bg-white/90 shadow-[0_18px_52px_rgba(15,23,42,0.08)] backdrop-blur">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Guided showcase
+                  </p>
+                  <h2 className="font-display text-2xl font-semibold tracking-tight text-slate-950">
+                    Swipe through the story
+                  </h2>
+                </div>
+                <Badge className="bg-slate-950 text-white hover:bg-slate-950">
+                  {activeStep + 1}/{steps.length}
+                </Badge>
+              </div>
+
+              {compactStepNav}
+
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Current step
+                </p>
+                <p className="mt-2 font-display text-lg font-semibold tracking-tight text-slate-950">
+                  {steps[activeStep]?.label}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {steps[activeStep]?.body}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={activeStep === 0}
+                  onClick={() => scrollToSection(Math.max(activeStep - 1, 0))}
+                  variant="outline"
+                >
+                  <ChevronLeft className="size-4" />
+                  Prev
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={activeStep === steps.length - 1}
+                  onClick={() =>
+                    scrollToSection(Math.min(activeStep + 1, steps.length - 1))
+                  }
+                >
+                  Next
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div id="overview" className="scroll-mt-8">
           <Card className="overflow-hidden rounded-[2.25rem] border-slate-200/80 bg-[linear-gradient(135deg,_rgba(8,15,29,0.98),_rgba(18,58,99,0.92)_56%,_rgba(245,184,46,0.88))] text-white shadow-[0_26px_72px_rgba(15,23,42,0.16)]">
             <CardContent className="grid gap-6 p-6 md:p-8 xl:grid-cols-[1.2fr_0.8fr]">
@@ -492,17 +593,21 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                     showcase companion.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button
                     asChild
-                    className="bg-white text-slate-950 hover:bg-slate-100"
+                    className="w-full bg-white text-slate-950 hover:bg-slate-100 sm:w-auto"
                   >
                     <Link href="/dashboard">
                       Open dashboard
                       <ArrowRight className="size-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="border-white/15 bg-white/10 text-white hover:bg-white/15">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full border-white/15 bg-white/10 text-white hover:bg-white/15 sm:w-auto"
+                  >
                     <Link href="/dashboard/places/nearby">
                       Open nearby generator
                       <Layers3 className="size-4" />

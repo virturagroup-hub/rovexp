@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Fragment } from "react";
 import { usePathname } from "next/navigation";
 import {
   BadgeCheck,
@@ -17,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { SheetClose } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export type SidebarNavIconKey =
@@ -33,7 +35,7 @@ export type SidebarNavIconKey =
   | "reviews"
   | "users";
 
-interface SidebarNavItem {
+export interface SidebarNavItem {
   href: string;
   iconKey: SidebarNavIconKey;
   label: string;
@@ -42,6 +44,7 @@ interface SidebarNavItem {
 
 interface SidebarNavProps {
   items: SidebarNavItem[];
+  closeOnNavigate?: boolean;
 }
 
 const iconMap: Record<SidebarNavIconKey, React.ComponentType<{ className?: string }>> = {
@@ -59,7 +62,7 @@ const iconMap: Record<SidebarNavIconKey, React.ComponentType<{ className?: strin
   users: Users,
 };
 
-export function SidebarNav({ items }: SidebarNavProps) {
+export function SidebarNav({ closeOnNavigate = false, items }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
@@ -69,9 +72,8 @@ export function SidebarNav({ items }: SidebarNavProps) {
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = iconMap[item.iconKey];
 
-        return (
+        const link = (
           <Link
-            key={item.href}
             href={item.href}
             className={cn(
               "group flex items-start gap-3 rounded-3xl border px-4 py-3 transition",
@@ -102,6 +104,14 @@ export function SidebarNav({ items }: SidebarNavProps) {
               </span>
             </span>
           </Link>
+        );
+
+        return closeOnNavigate ? (
+          <SheetClose asChild key={item.href}>
+            {link}
+          </SheetClose>
+        ) : (
+          <Fragment key={item.href}>{link}</Fragment>
         );
       })}
     </nav>
