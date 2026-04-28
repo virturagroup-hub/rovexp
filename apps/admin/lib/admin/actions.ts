@@ -541,18 +541,21 @@ export async function generateQuestCandidateAction(formData: FormData) {
     redirect("/dashboard/places?error=check-form");
   }
 
+  let candidate: Awaited<ReturnType<typeof generateQuestCandidateFromPlace>>;
+
   try {
-    const candidate = await generateQuestCandidateFromPlace(placeId);
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/places");
-    revalidatePath("/dashboard/places/nearby");
-    revalidatePath("/dashboard/candidates");
-    redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
+    candidate = await generateQuestCandidateFromPlace(placeId);
   } catch (error) {
     const code = generationErrorCode(error);
     const detail = encodeURIComponent(generationErrorDetail(error));
     redirect(`/dashboard/places?error=${code}&detail=${detail}`);
   }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/places/nearby");
+  revalidatePath("/dashboard/candidates");
+  redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
 }
 
 export async function savePlaceFromMapAction(formData: FormData) {
@@ -613,10 +616,12 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
     redirect("/dashboard/places?error=check-form");
   }
 
+  let savedPlace: Awaited<ReturnType<typeof savePlace>> | null = null;
+
   try {
     const description = toNullable(parsed.data.description) ?? toNullable(parsed.data.public_description);
 
-    const savedPlace = await savePlace({
+    savedPlace = await savePlace({
       address: toNullable(parsed.data.address),
       city: toNullable(parsed.data.city),
       description,
@@ -639,17 +644,6 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
       state_id: toNullable(parsed.data.state_id),
       website: toNullable(parsed.data.website),
     });
-
-    if (!savedPlace?.id) {
-      redirect("/dashboard/places?error=check-form");
-    }
-
-    const candidate = await generateQuestCandidateFromPlace(savedPlace.id);
-
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/places");
-    revalidatePath("/dashboard/candidates");
-    redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
   } catch (error) {
     if (isStateReferenceError(error)) {
       redirect("/dashboard/places?error=state-invalid");
@@ -659,6 +653,25 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
     const detail = encodeURIComponent(generationErrorDetail(error));
     redirect(`/dashboard/places?error=${code}&detail=${detail}`);
   }
+
+  if (!savedPlace?.id) {
+    redirect("/dashboard/places?error=check-form");
+  }
+
+  let candidate: Awaited<ReturnType<typeof generateQuestCandidateFromPlace>>;
+
+  try {
+    candidate = await generateQuestCandidateFromPlace(savedPlace.id);
+  } catch (error) {
+    const code = generationErrorCode(error);
+    const detail = encodeURIComponent(generationErrorDetail(error));
+    redirect(`/dashboard/places?error=${code}&detail=${detail}`);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/candidates");
+  redirect(`/dashboard/candidates?edit=${candidate.id}&status=generated`);
 }
 
 export async function deletePlaceAction(formData: FormData) {
@@ -716,8 +729,10 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
     redirect("/dashboard/places/nearby?error=select-some-places");
   }
 
+  let result: Awaited<ReturnType<typeof generateNearbyQuestCandidatesFromSearch>>;
+
   try {
-    const result = await generateNearbyQuestCandidatesFromSearch({
+    result = await generateNearbyQuestCandidatesFromSearch({
       active_only: parsed.data.active_only,
       area_label: parsed.data.area_label || undefined,
       city: parsed.data.city || undefined,
@@ -733,35 +748,35 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
         intent === "generate_selected" ? parsed.data.selected_place_ids : [],
       state_id: parsed.data.state_id,
     });
-
-    const summary = { ...result, created_candidates: undefined };
-    const params = new URLSearchParams({
-      active_only: parsed.data.active_only ? "on" : "",
-      area_label: parsed.data.area_label ?? "",
-      city: parsed.data.city ?? "",
-      latitude: parsed.data.latitude === null ? "" : String(parsed.data.latitude),
-      longitude: parsed.data.longitude === null ? "" : String(parsed.data.longitude),
-      min_rating: parsed.data.min_rating === null ? "" : String(parsed.data.min_rating),
-      min_review_count: parsed.data.min_review_count === null ? "" : String(parsed.data.min_review_count),
-      place_types: parsed.data.place_types ?? "",
-      public_only: parsed.data.public_only ? "on" : "",
-      radius_miles: parsed.data.radius_miles === null ? "" : String(parsed.data.radius_miles),
-      search_mode: parsed.data.search_mode,
-      state_id: parsed.data.state_id,
-      status: "bulk-generated",
-      summary: JSON.stringify(summary),
-    });
-
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/places");
-    revalidatePath("/dashboard/places/nearby");
-    revalidatePath("/dashboard/candidates");
-    revalidatePath("/dashboard/quests");
-
-    redirect(`/dashboard/places/nearby?${params.toString()}`);
   } catch {
     redirect("/dashboard/places/nearby?error=check-form");
   }
+
+  const summary = { ...result, created_candidates: undefined };
+  const params = new URLSearchParams({
+    active_only: parsed.data.active_only ? "on" : "",
+    area_label: parsed.data.area_label ?? "",
+    city: parsed.data.city ?? "",
+    latitude: parsed.data.latitude === null ? "" : String(parsed.data.latitude),
+    longitude: parsed.data.longitude === null ? "" : String(parsed.data.longitude),
+    min_rating: parsed.data.min_rating === null ? "" : String(parsed.data.min_rating),
+    min_review_count: parsed.data.min_review_count === null ? "" : String(parsed.data.min_review_count),
+    place_types: parsed.data.place_types ?? "",
+    public_only: parsed.data.public_only ? "on" : "",
+    radius_miles: parsed.data.radius_miles === null ? "" : String(parsed.data.radius_miles),
+    search_mode: parsed.data.search_mode,
+    state_id: parsed.data.state_id,
+    status: "bulk-generated",
+    summary: JSON.stringify(summary),
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/places");
+  revalidatePath("/dashboard/places/nearby");
+  revalidatePath("/dashboard/candidates");
+  revalidatePath("/dashboard/quests");
+
+  redirect(`/dashboard/places/nearby?${params.toString()}`);
 }
 
 export async function saveQuestCandidateAction(formData: FormData) {
