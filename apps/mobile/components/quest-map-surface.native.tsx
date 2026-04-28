@@ -9,7 +9,11 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, {
+  Marker,
+  PROVIDER_DEFAULT,
+  PROVIDER_GOOGLE,
+} from "react-native-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsButton } from "@/components/settings-button";
@@ -136,19 +140,19 @@ export function QuestMapSurface({
                 <Text style={styles.mapLoadingText}>Loading quest markers...</Text>
               </View>
             ) : mapMarkerQuests.length ? (
-              <MapView
-                onMapReady={() => setMapReady(true)}
-                ref={mapRef}
-                initialRegion={{
-                  latitude: centerLatitude,
+                <MapView
+                  onMapReady={() => setMapReady(true)}
+                  ref={mapRef}
+                  initialRegion={{
+                    latitude: centerLatitude,
                   latitudeDelta: 0.075,
-                  longitude: centerLongitude,
-                  longitudeDelta: 0.075,
-                }}
-                provider={PROVIDER_DEFAULT}
-                showsUserLocation={locationPermission === "granted"}
-                style={StyleSheet.absoluteFill}
-              >
+                    longitude: centerLongitude,
+                    longitudeDelta: 0.075,
+                  }}
+                provider={Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
+                  showsUserLocation={locationPermission === "granted"}
+                  style={StyleSheet.absoluteFill}
+                >
                 {mapMarkerQuests.map((quest) => {
                   const status = questProgress[quest.id]?.status ?? "available";
                   const pinColor =
