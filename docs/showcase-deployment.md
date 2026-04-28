@@ -110,6 +110,7 @@ The app surfaces runtime status explicitly so testers can tell whether they are 
 
 The admin portal also supports an intentional demo walkthrough path when `ADMIN_DEMO_ENABLED=true`.
 That path is useful for showcasing the dashboard, places, nearby generation, candidates, and moderation tools without needing a privileged live account every time.
+There is also a no-login `/demo` route that seeds the same demo session and lands directly in the dashboard for quick presentations.
 
 ## Manual Steps Outside the Repo
 

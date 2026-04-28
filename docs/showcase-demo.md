@@ -13,7 +13,8 @@ This is the short handoff for the deadline-friendly demo path.
 
 - Open the admin portal.
 - If `ADMIN_DEMO_ENABLED=true`, the login page shows `Open demo walkthrough`.
-- That button enters the seeded mock admin store and keeps live content untouched.
+- You can also open `/demo` directly to skip login and enter the seeded demo session immediately.
+- Those demo paths use the seeded mock admin store and keep live content untouched.
 - If you want the real admin flow, sign in with a Supabase admin user and open `/showcase`.
 
 ## Seeded content
@@ -39,4 +40,3 @@ The mobile demo board is aligned to downtown Chicago so the seeded quests appear
 - `/dashboard/places`
 - `/dashboard/places/nearby`
 - `/dashboard/candidates`
-

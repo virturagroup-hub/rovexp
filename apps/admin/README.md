@@ -80,6 +80,10 @@ That path uses the seeded mock admin store and is meant for showcase exploration
 The dashboard also exposes a persistent `/showcase` route that opens the same guided demo
 inside the admin deployment after sign-in.
 
+There is also a no-login demo route at `/demo`. It sets the same seeded demo session and
+redirects straight into the dashboard, which is useful when you want to show the admin site
+without first completing Supabase auth.
+
 - live auth still works normally
 - demo mode is only entered when the user explicitly chooses it
 - demo mode can be disabled in production by leaving `ADMIN_DEMO_ENABLED` unset or `false`
@@ -129,7 +133,8 @@ The intended showcase path is:
 
 1. open `/login`
 2. if `ADMIN_DEMO_ENABLED=true`, click `Open demo walkthrough`
-3. or sign in with a promoted Supabase admin account and open `/showcase`
+3. or open `/demo` to skip login and enter the demo session directly
+4. or sign in with a promoted Supabase admin account and open `/showcase`
 
 This demo mode uses the seeded mock admin store and is intentionally non-destructive. It is the safest way to present the admin experience during a deadline run.
 

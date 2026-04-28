@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { ShieldCheck, Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { StatusBanner } from "@/components/admin/status-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getAdminSession } from "@/lib/admin/auth";
@@ -145,11 +147,21 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                       Try a safe demo walkthrough that uses the seeded mock admin store and keeps live content untouched.
                     </p>
                   </div>
-                  <form action={enterDemoAction}>
-                    <SubmitButton className="bg-sky-700 text-white hover:bg-sky-600">
-                      Open demo walkthrough
-                    </SubmitButton>
-                  </form>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <form action={enterDemoAction}>
+                      <SubmitButton className="w-full bg-sky-700 text-white hover:bg-sky-600">
+                        Open demo walkthrough
+                      </SubmitButton>
+                    </form>
+                    <Button asChild variant="outline" className="w-full border-sky-200 bg-white text-sky-900 hover:bg-sky-50">
+                      <Link href="/demo">
+                        Open demo without login
+                      </Link>
+                    </Button>
+                  </div>
+                  <p className="text-xs leading-6 text-sky-700">
+                    The no-login demo route seeds the same safe session and lands you on the dashboard immediately.
+                  </p>
                 </div>
               ) : (
                 <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600">
