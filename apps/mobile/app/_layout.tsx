@@ -80,11 +80,13 @@ export default function RootLayout() {
               headerShown: false,
             }}
           >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="welcome" />
-            <Stack.Screen name="permissions" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="settings" />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="welcome" />
+          <Stack.Screen name="permissions" />
+          <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="auth/change-password" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="settings" />
             <Stack.Screen name="leaderboards" />
             <Stack.Screen name="profile-edit" options={{ presentation: "modal" }} />
             <Stack.Screen name="quest/[questId]" />

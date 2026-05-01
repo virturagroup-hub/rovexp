@@ -193,6 +193,7 @@ const styles = StyleSheet.create({
   heroMeta: {
     color: theme.colors.muted,
     fontSize: 14,
+    flexShrink: 1,
     lineHeight: 20,
   },
   heroName: {
@@ -256,6 +257,8 @@ const styles = StyleSheet.create({
   rankMeta: {
     color: theme.colors.muted,
     fontSize: 13,
+    flexShrink: 1,
+    lineHeight: 19,
     marginTop: 4,
   },
   rankName: {

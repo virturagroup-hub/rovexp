@@ -26,7 +26,6 @@ import { describeLocationStatus } from "@/lib/location-status";
 import {
   useQuestFeedQuery,
   useQuestFlowMutations,
-  useQuestVisibilityMutations,
 } from "@/hooks/use-rovexp-data";
 import { mobileEnv } from "@/lib/env";
 import type { QuestFeedItem } from "@/services/quests";
@@ -82,10 +81,10 @@ function QuestRail({
   isBusy,
   locationPermission,
   onAccept,
+  onCancelQuest,
   onActionPress,
   onCheckIn,
   onComplete,
-  onHideQuest,
   progress,
   quests,
   showDots = false,
@@ -102,10 +101,10 @@ function QuestRail({
   isBusy: boolean;
   locationPermission: Parameters<typeof QuestCard>[0]["locationPermission"];
   onAccept: Parameters<typeof QuestCard>[0]["onAccept"];
+  onCancelQuest?: Parameters<typeof QuestCard>[0]["onCancelQuest"];
   onActionPress?: () => void;
   onCheckIn: Parameters<typeof QuestCard>[0]["onCheckIn"];
   onComplete: Parameters<typeof QuestCard>[0]["onComplete"];
-  onHideQuest?: Parameters<typeof QuestCard>[0]["onHideQuest"];
   progress: Record<string, QuestProgress | undefined>;
   quests: QuestFeedItem[];
   showDots?: boolean;
@@ -114,6 +113,7 @@ function QuestRail({
   width: number;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   return (
     <View>
@@ -141,6 +141,9 @@ function QuestRail({
             showsHorizontalScrollIndicator={false}
             snapToInterval={width + railGap}
             snapToAlignment="start"
+            onScrollBeginDrag={() => {
+              setExpandedIndex(null);
+            }}
             onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
               const index = Math.round(
                 event.nativeEvent.contentOffset.x / (width + railGap),
@@ -159,12 +162,16 @@ function QuestRail({
                 <QuestCard
                   compact={compact}
                   currentLocation={currentLocation}
+                  expanded={expandedIndex === index}
                   isBusy={isBusy}
                   locationPermission={locationPermission}
                   onAccept={onAccept}
+                  onCancelQuest={onCancelQuest}
+                  onExpandedChange={(nextExpanded) =>
+                    setExpandedIndex(nextExpanded ? index : null)
+                  }
                   onCheckIn={onCheckIn}
                   onComplete={onComplete}
-                  onHideQuest={onHideQuest}
                   progress={progress[quest.id]}
                   quest={quest}
                   style={styles.railCard}
@@ -207,9 +214,8 @@ export default function HomeScreen() {
   const lastKnownLocation = useAppStore((state) => state.lastKnownLocation);
   const setStoredLocation = useAppStore((state) => state.setStoredLocation);
   const { data, isLoading } = useQuestFeedQuery();
-  const { acceptMutation, checkInMutation, completeMutation } =
+  const { acceptMutation, cancelMutation, checkInMutation, completeMutation } =
     useQuestFlowMutations();
-  const { hideSponsoredMutation } = useQuestVisibilityMutations();
   const { width } = useWindowDimensions();
   const demoLocation = {
     areaLabel: mobileEnv.defaultAreaLabel,
@@ -295,6 +301,18 @@ export default function HomeScreen() {
     }
   };
 
+  const handleCancelQuest = async (quest: QuestFeedItem) => {
+    try {
+      await cancelMutation.mutateAsync(quest);
+      Alert.alert("Quest canceled", "The acceptance has been removed.");
+    } catch (error) {
+      Alert.alert(
+        "Could not cancel quest",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    }
+  };
+
   const handleCheckIn = async (quest: QuestFeedItem) => {
     if (!questProgress[quest.id]?.accepted_id) {
       Alert.alert("Accept required", "Accept the quest before checking in.");
@@ -344,22 +362,11 @@ export default function HomeScreen() {
     }
   };
 
-  const handleHideSponsoredQuest = async (quest: QuestFeedItem) => {
-    try {
-      await hideSponsoredMutation.mutateAsync(quest.id);
-    } catch (error) {
-      Alert.alert(
-        "Could not hide quest",
-        error instanceof Error ? error.message : "Please try again.",
-      );
-    }
-  };
-
   const busy =
     acceptMutation.isPending ||
+    cancelMutation.isPending ||
     checkInMutation.isPending ||
-    completeMutation.isPending ||
-    hideSponsoredMutation.isPending;
+    completeMutation.isPending;
   const firstName = displayName.split(" ")[0];
   const sponsoredCardWidth = Math.min(320, Math.max(280, Math.round(width * 0.76)));
   const featuredCardWidth = Math.min(356, Math.max(300, Math.round(width * 0.84)));
@@ -472,10 +479,10 @@ export default function HomeScreen() {
           isBusy={busy}
           locationPermission={locationPermission}
           onAccept={handleAccept}
+          onCancelQuest={handleCancelQuest}
           onActionPress={() => router.push("/settings")}
           onCheckIn={handleCheckIn}
           onComplete={handleComplete}
-          onHideQuest={handleHideSponsoredQuest}
           progress={questProgress}
           quests={isLoading ? [] : data?.sponsored ?? []}
           subtitle="Partner-backed quests stay separate so they feel premium without blending into the standard board."
@@ -493,6 +500,7 @@ export default function HomeScreen() {
           isBusy={busy}
           locationPermission={locationPermission}
           onAccept={handleAccept}
+          onCancelQuest={handleCancelQuest}
           onActionPress={() => router.push("/(tabs)/quests")}
           onCheckIn={handleCheckIn}
           onComplete={handleComplete}

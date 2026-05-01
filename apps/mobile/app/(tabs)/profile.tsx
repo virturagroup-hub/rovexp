@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Medal, ShieldCheck } from "lucide-react-native";
+import { Compass, MapPinned, Medal, ShieldCheck, Star } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { SettingsButton } from "@/components/settings-button";
@@ -15,6 +15,19 @@ import { tabBarLayout } from "@/constants/navigation";
 import { useProfileSummaryQuery } from "@/hooks/use-rovexp-data";
 import { signOutMobileSession } from "@/services/auth";
 import { useAppStore } from "@/store/app-store";
+
+function badgeIconForKey(iconKey: string) {
+  switch (iconKey) {
+    case "pin-spark":
+      return MapPinned;
+    case "trail-ring":
+      return Compass;
+    case "review-star":
+      return Star;
+    default:
+      return ShieldCheck;
+  }
+}
 
 export default function ProfileScreen() {
   const { data } = useProfileSummaryQuery();
@@ -100,15 +113,19 @@ export default function ProfileScreen() {
           />
           {data?.featured_badges.length ? (
             <View style={styles.badgeGrid}>
-              {data.featured_badges.map((badge) => (
-                <View key={badge.id} style={styles.badgeCard}>
-                  <View style={styles.badgeIcon}>
-                    <ShieldCheck color={theme.colors.accent} size={16} />
+              {data.featured_badges.map((badge) => {
+                const Icon = badgeIconForKey(badge.icon_key);
+
+                return (
+                  <View key={badge.id} style={styles.badgeCard}>
+                    <View style={styles.badgeIcon}>
+                      <Icon color={theme.colors.accent} size={16} />
+                    </View>
+                    <Text style={styles.badgeName}>{badge.name}</Text>
+                    <Text style={styles.badgeDescription}>{badge.description}</Text>
                   </View>
-                  <Text style={styles.badgeName}>{badge.name}</Text>
-                  <Text style={styles.badgeDescription}>{badge.description}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <EmptyStateCard

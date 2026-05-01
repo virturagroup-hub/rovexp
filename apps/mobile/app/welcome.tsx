@@ -9,7 +9,9 @@ import {
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -22,6 +24,7 @@ import { OnboardingShell } from "@/components/onboarding-shell";
 import { theme } from "@/constants/theme";
 import { hasSupabaseConfig, mobileEnv } from "@/lib/env";
 import {
+  requestPasswordReset,
   signInWithEmail,
   signInWithOAuthProvider,
   signUpWithEmail,
@@ -191,6 +194,33 @@ export default function WelcomeScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert(
+        "Add your email first",
+        "Enter the email address you use for RoveXP before requesting a reset link.",
+      );
+      return;
+    }
+
+    try {
+      setBusy(true);
+      setMessage(null);
+      await requestPasswordReset(email.trim());
+      Alert.alert(
+        "Reset link sent",
+        "Check your inbox for a password reset link and come back here when you are ready.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Could not send reset link",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleOAuth = async (provider: "google" | "facebook" | "apple") => {
     try {
       setBusyProvider(provider);
@@ -278,6 +308,17 @@ export default function WelcomeScreen() {
       {step === 0 ? (
         <>
           <View style={styles.panel}>
+            <View style={styles.appMark}>
+              <Image
+                source={require("../assets/images/icon.png")}
+                style={styles.appMarkImage}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.appMarkEyebrow}>RoveXP</Text>
+                <Text style={styles.appMarkTitle}>Adventure ops, polished for the road.</Text>
+              </View>
+            </View>
+
             <View style={styles.inlineHero}>
               <View style={styles.routeBadge}>
                 <MapPinned color={theme.colors.cyan} size={22} />
@@ -540,6 +581,20 @@ export default function WelcomeScreen() {
                 value={password}
               />
 
+              {mode === "sign-in" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={() => void handleForgotPassword()}
+                  style={({ pressed }) => [
+                    styles.forgotPasswordButton,
+                    pressed && !busy && styles.forgotPasswordButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                </Pressable>
+              ) : null}
+
               <Text style={styles.authHint}>
                 {hasSupabaseConfig
                   ? `Continue will ${mode === "sign-in" ? "sign you in" : "create your explorer account"} and keep your profile synced.`
@@ -574,6 +629,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  appMark: {
+    alignItems: "center",
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  appMarkEyebrow: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  appMarkImage: {
+    borderRadius: 18,
+    height: 52,
+    width: 52,
+  },
+  appMarkTitle: {
+    color: theme.colors.ink,
+    fontFamily: "SpaceMono",
+    fontSize: 16,
+    lineHeight: 22,
+    marginTop: 2,
+  },
   authModeChip: {
     backgroundColor: theme.colors.panel,
     borderColor: theme.colors.border,
@@ -598,6 +682,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  forgotPasswordButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+  },
+  forgotPasswordButtonPressed: {
+    opacity: 0.7,
+  },
+  forgotPasswordText: {
+    color: theme.colors.deepBlue,
+    fontSize: 13,
+    fontWeight: "800",
   },
   providerBadge: {
     alignItems: "center",

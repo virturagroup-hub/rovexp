@@ -10,6 +10,7 @@ import type {
 import { getLeaderboardSnapshot } from "@/services/leaderboard";
 import {
   acceptQuest,
+  cancelAcceptedQuest,
   checkInQuest,
   completeQuest,
   hideSponsoredQuest,
@@ -20,6 +21,7 @@ import {
   type QuestFeedItem,
 } from "@/services/quests";
 import {
+  getAdminAccessSummary,
   getProfileSummary,
   listStates,
   saveUserSettings,
@@ -77,6 +79,16 @@ export function useQuestFeedQuery() {
         location: liveLocation,
         radiusMiles: preferredRadiusMiles,
       }),
+  });
+}
+
+export function useAdminAccessQuery() {
+  const userId = useAppStore((state) => state.userId);
+
+  return useQuery({
+    enabled: Boolean(userId),
+    queryKey: ["admin-access", userId],
+    queryFn: getAdminAccessSummary,
   });
 }
 
@@ -243,6 +255,7 @@ export function useQuestFlowMutations() {
   const queryClient = useQueryClient();
   const authMode = useAppStore((state) => state.authMode);
   const acceptQuestInStore = useAppStore((state) => state.acceptQuest);
+  const cancelQuestInStore = useAppStore((state) => state.cancelQuest);
   const checkInQuestInStore = useAppStore((state) => state.checkInQuest);
   const completeQuestInStore = useAppStore((state) => state.completeQuest);
   const recordReview = useAppStore((state) => state.recordReview);
@@ -301,6 +314,21 @@ export function useQuestFlowMutations() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (quest: QuestFeedItem) =>
+      cancelAcceptedQuest({ demoMode: authMode === "demo", questId: quest.id }),
+    onSuccess: async (_result, quest) => {
+      cancelQuestInStore(quest.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["leaderboards"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["quest-feed"] }),
+        queryClient.invalidateQueries({ queryKey: ["quest-progress"] }),
+      ]);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+  });
+
   const reviewMutation = useMutation({
     mutationFn: (params: ReviewFormInput & {
       completionId: string;
@@ -330,6 +358,7 @@ export function useQuestFlowMutations() {
 
   return {
     acceptMutation,
+    cancelMutation,
     checkInMutation,
     completeMutation,
     reviewMutation,

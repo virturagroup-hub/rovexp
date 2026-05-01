@@ -9,27 +9,16 @@ import { ActionButton, ScreenHeader, ScreenView } from "@/components/ui";
 import { theme } from "@/constants/theme";
 import { captureCurrentLocationSnapshot } from "@/lib/location";
 import { describeLocationStatus } from "@/lib/location-status";
+import { describeSupabaseRuntimeSource } from "@/lib/runtime-status";
 import {
+  useAdminAccessQuery,
   useProfileMutations,
-  useQuestCategoriesQuery,
-  useQuestVisibilityMutations,
+  useQuestFeedQuery,
 } from "@/hooks/use-rovexp-data";
 import { signOutMobileSession } from "@/services/auth";
 import { useAppStore } from "@/store/app-store";
 
 const radiusOptions = [3, 8, 15, 25];
-const rarityOptions = ["common", "rare", "epic", "legendary"] as const;
-const discoveryOptions = [
-  { label: "Popular", value: "popular" },
-  { label: "Hidden gems", value: "hidden_gem" },
-  { label: "Featured", value: "featured_route" },
-] as const;
-
-function toggleValue(values: string[], value: string) {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-}
 
 export default function SettingsScreen() {
   const preferredRadiusMiles = useAppStore((state) => state.preferredRadiusMiles);
@@ -43,15 +32,17 @@ export default function SettingsScreen() {
   const setLocationPermission = useAppStore((state) => state.setLocationPermission);
   const setCameraPermission = useAppStore((state) => state.setCameraPermission);
   const toggleNotifications = useAppStore((state) => state.toggleNotifications);
-  const setQuestFilters = useAppStore((state) => state.setQuestFilters);
   const signOut = useAppStore((state) => state.signOut);
-  const { data: categories } = useQuestCategoriesQuery();
+  const { data: adminAccess } = useAdminAccessQuery();
+  const { data: questFeed } = useQuestFeedQuery();
   const { settingsMutation } = useProfileMutations();
-  const { resetHiddenSponsoredMutation } = useQuestVisibilityMutations();
   const locationStatus = describeLocationStatus({
     lastKnownLocation,
     locationPermission,
   });
+  const runtimeStatus = questFeed?.runtimeSource
+    ? describeSupabaseRuntimeSource(questFeed.runtimeSource, questFeed.runtimeMessage)
+    : null;
 
   const handleLocationRetry = async () => {
     const response = await Location.requestForegroundPermissionsAsync();
@@ -102,21 +93,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleResetHiddenSponsored = async () => {
-    try {
-      await resetHiddenSponsoredMutation.mutateAsync();
-      Alert.alert(
-        "Sponsored spotlight reset",
-        "Hidden sponsored quests will appear in the Home spotlight again.",
-      );
-    } catch (error) {
-      Alert.alert(
-        "Could not reset spotlight",
-        error instanceof Error ? error.message : "Please try again.",
-      );
-    }
-  };
-
   return (
     <ScreenView>
       <ScrollView
@@ -130,7 +106,7 @@ export default function SettingsScreen() {
               <ChevronLeft color={theme.colors.textOnDark} size={18} />
             </Pressable>
           }
-          subtitle="Tune quest radius, permission refresh, and the persistent discovery filters used across the mobile app."
+          subtitle="Tune quest radius, refresh permissions, and keep account settings tidy. Discovery filters now live on the Quests board."
           title="Settings"
         />
 
@@ -212,139 +188,52 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Discovery filters</Text>
+          <Text style={styles.cardTitle}>Quest filters</Text>
           <Text style={styles.cardBody}>
-            These preferences are saved back to your user settings and reused by Home, Quests, and Map.
+            Your current saved discovery defaults still travel with Home and the map, but the main
+            live filter controls now stay on the Quests board so this screen can stay cleaner.
           </Text>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Sponsor mode</Text>
-            <View style={styles.chipRow}>
-              {["all", "sponsored", "regular"].map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() =>
-                    setQuestFilters((current) => ({
-                      ...current,
-                      sponsor_filter: value as typeof current.sponsor_filter,
-                    }))
-                  }
-                  style={[
-                    styles.radiusChip,
-                    questFilters.sponsor_filter === value && styles.radiusChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.radiusChipText,
-                      questFilters.sponsor_filter === value && styles.radiusChipTextActive,
-                    ]}
-                  >
-                    {value}
-                  </Text>
-                </Pressable>
-              ))}
+          <View style={styles.questFilterSummary}>
+            <View style={styles.summaryRowInline}>
+              <Text style={styles.preferenceLabel}>Sponsor mode</Text>
+              <Text style={styles.preferenceValue}>
+                {questFilters.sponsor_filter === "all"
+                  ? "All quests"
+                  : questFilters.sponsor_filter === "sponsored"
+                    ? "Sponsored only"
+                    : "Regular only"}
+              </Text>
+            </View>
+            <View style={styles.summaryRowInline}>
+              <Text style={styles.preferenceLabel}>Discovery</Text>
+              <Text style={styles.preferenceValue}>
+                {questFilters.discovery_types.length
+                  ? `${questFilters.discovery_types.length} selected`
+                  : "All discovery types"}
+              </Text>
+            </View>
+            <View style={styles.summaryRowInline}>
+              <Text style={styles.preferenceLabel}>Rarity</Text>
+              <Text style={styles.preferenceValue}>
+                {questFilters.rarities.length
+                  ? `${questFilters.rarities.length} selected`
+                  : "All rarities"}
+              </Text>
+            </View>
+            <View style={styles.summaryRowInline}>
+              <Text style={styles.preferenceLabel}>Categories</Text>
+              <Text style={styles.preferenceValue}>
+                {questFilters.category_slugs.length
+                  ? `${questFilters.category_slugs.length} selected`
+                  : "All categories"}
+              </Text>
             </View>
           </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Discovery</Text>
-            <View style={styles.chipRow}>
-              {discoveryOptions.map((option) => {
-                const active = questFilters.discovery_types.includes(option.value);
-
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        discovery_types: toggleValue(
-                          current.discovery_types,
-                          option.value,
-                        ) as typeof current.discovery_types,
-                      }))
-                    }
-                    style={[styles.radiusChip, active && styles.radiusChipActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.radiusChipText,
-                        active && styles.radiusChipTextActive,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Rarity</Text>
-            <View style={styles.chipRow}>
-              {rarityOptions.map((rarity) => {
-                const active = questFilters.rarities.includes(rarity);
-
-                return (
-                  <Pressable
-                    key={rarity}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        rarities: toggleValue(current.rarities, rarity) as typeof current.rarities,
-                      }))
-                    }
-                    style={[styles.radiusChip, active && styles.radiusChipActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.radiusChipText,
-                        active && styles.radiusChipTextActive,
-                      ]}
-                    >
-                      {rarity}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Categories</Text>
-            <View style={styles.chipRow}>
-              {categories?.map((category) => {
-                const active = questFilters.category_slugs.includes(category.slug);
-
-                return (
-                  <Pressable
-                    key={category.id}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        category_slugs: toggleValue(
-                          current.category_slugs,
-                          category.slug,
-                        ),
-                      }))
-                    }
-                    style={[styles.radiusChip, active && styles.radiusChipActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.radiusChipText,
-                        active && styles.radiusChipTextActive,
-                      ]}
-                    >
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
+          <ActionButton
+            label="Open quest filters"
+            onPress={() => router.push("/(tabs)/quests")}
+            secondary
+          />
         </View>
 
         <View style={styles.card}>
@@ -368,24 +257,6 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sponsored spotlight</Text>
-          <Text style={styles.cardBody}>
-            Sponsored quests you hide from Home are stored per user and can be
-            restored here later.
-          </Text>
-          <ActionButton
-            disabled={resetHiddenSponsoredMutation.isPending}
-            label={
-              resetHiddenSponsoredMutation.isPending
-                ? "Resetting spotlight..."
-                : "Reset hidden sponsored quests"
-            }
-            onPress={handleResetHiddenSponsored}
-            secondary
-          />
-        </View>
-
         <ActionButton
           disabled={settingsMutation.isPending}
           label={
@@ -399,8 +270,54 @@ export default function SettingsScreen() {
           <Text style={styles.cardBody}>
             Signing out clears the local session snapshot and returns you to the auth entry screen.
           </Text>
+          <ActionButton
+            label="Change password"
+            onPress={() => router.push("/auth/change-password" as never)}
+            secondary
+          />
           <ActionButton label="Sign out" onPress={handleSignOut} secondary />
         </View>
+
+        {adminAccess ? (
+          <View style={styles.debugCard}>
+            <Text style={styles.debugEyebrow}>Admin status</Text>
+            <Text style={styles.debugTitle}>Lightweight runtime snapshot</Text>
+            <View style={styles.debugPills}>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Role</Text>
+                <Text style={styles.debugPillValue}>{adminAccess.role}</Text>
+              </View>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Data</Text>
+                <Text style={styles.debugPillValue}>
+                  {runtimeStatus?.label ?? "Unknown"}
+                </Text>
+              </View>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Location</Text>
+                <Text style={styles.debugPillValue}>{locationStatus.label}</Text>
+              </View>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Visible quests</Text>
+                <Text style={styles.debugPillValue}>
+                  {questFeed?.all.length ?? 0}
+                </Text>
+              </View>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Sponsored</Text>
+                <Text style={styles.debugPillValue}>
+                  {questFeed?.sponsored.length ?? 0}
+                </Text>
+              </View>
+              <View style={styles.debugPill}>
+                <Text style={styles.debugPillLabel}>Nearby</Text>
+                <Text style={styles.debugPillValue}>
+                  {questFeed?.nearby.length ?? 0}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
     </ScreenView>
   );
@@ -491,6 +408,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: "capitalize",
   },
+  questFilterSummary: {
+    gap: 10,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  summaryRowInline: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   statusBody: {
     color: theme.colors.muted,
     fontSize: 13,
@@ -562,5 +490,54 @@ const styles = StyleSheet.create({
   },
   radiusChipTextActive: {
     color: theme.colors.white,
+  },
+  debugCard: {
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.large,
+    borderWidth: 1,
+    gap: 12,
+    padding: 18,
+  },
+  debugEyebrow: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  debugPill: {
+    backgroundColor: theme.colors.panel,
+    borderColor: theme.colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
+    gap: 2,
+    minWidth: 138,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  debugPillLabel: {
+    color: theme.colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  debugPillValue: {
+    color: theme.colors.ink,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  debugPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  debugTitle: {
+    color: theme.colors.ink,
+    fontFamily: "SpaceMono",
+    fontSize: 18,
   },
 });

@@ -7,10 +7,11 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react-native";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import {
   Alert,
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -203,18 +204,6 @@ export default function FriendsScreen() {
   );
   const requestCount = incomingRequests.length + outgoingRequests.length;
   const friendCode = profileSummary?.profile.friend_code ?? "RV-EXPLOR";
-
-  useEffect(() => {
-    if (selectedPreview || !hubEntries.length) {
-      return;
-    }
-
-    const featuredEntry = incomingRequests[0] ?? acceptedFriends[0] ?? outgoingRequests[0];
-
-    if (featuredEntry) {
-      setSelectedPreview(previewFromHub(featuredEntry));
-    }
-  }, [acceptedFriends, incomingRequests, hubEntries.length, outgoingRequests, selectedPreview]);
 
   const leaderboardFriendsCount = Math.max((leaderboard?.friends.entries.length ?? 0) - 1, 0);
 
@@ -432,167 +421,199 @@ export default function FriendsScreen() {
           )}
         </View>
 
-        {selectedPreview ? (
-          <View style={styles.previewCard}>
-            <SectionHeader
-              eyebrow="Profile preview"
-              subtitle="Tap a person from search, your friends list, or requests to see a compact social snapshot."
-              title={
-                selectedPreview.relationship_status === "friend"
-                  ? selectedPreview.display_name ?? `@${selectedPreview.username}`
-                  : `@${selectedPreview.username}`
-              }
+        <Modal
+          animationType="fade"
+          transparent
+          visible={Boolean(selectedPreview)}
+          onRequestClose={() => setSelectedPreview(null)}
+        >
+          <View style={styles.previewModalBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSelectedPreview(null)}
+              style={StyleSheet.absoluteFill}
             />
-            <View style={styles.previewTopRow}>
-              <View style={styles.previewAvatar}>
-                <Text style={styles.previewAvatarText}>
-                  {initialsForName(
-                    selectedPreview.relationship_status === "friend" &&
-                      selectedPreview.display_name
-                      ? selectedPreview.display_name
-                      : selectedPreview.username,
-                  )}
-                </Text>
-              </View>
-              <View style={styles.previewIntro}>
-                <Text style={styles.previewUsername}>@{selectedPreview.username}</Text>
-                {selectedPreview.friend_code ? (
-                  <Text style={styles.previewState}>
-                    Code: {selectedPreview.friend_code}
-                  </Text>
-                ) : null}
-                <Text style={styles.previewState}>
-                  {selectedPreview.home_state_code
-                    ? `${selectedPreview.home_state_code}${
-                        selectedPreview.home_state_name ? ` · ${selectedPreview.home_state_name}` : ""
-                      }`
-                    : "No home state set"}
-                </Text>
-                {selectedPreview.title_name ? (
-                  <View style={styles.previewTitleChip}>
-                    <BadgeCheck color={theme.colors.amber} size={14} />
-                    <Text style={styles.previewTitleChipText}>{selectedPreview.title_name}</Text>
+            <ScrollView
+              contentContainerStyle={styles.previewModalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedPreview ? (
+                <View style={styles.previewCard}>
+                  <SectionHeader
+                    actionLabel="Close"
+                    eyebrow="Profile preview"
+                    onActionPress={() => setSelectedPreview(null)}
+                    subtitle="Tap a person from search, your friends list, or requests to see a compact social snapshot."
+                    title={
+                      selectedPreview.relationship_status === "friend"
+                        ? selectedPreview.display_name ?? `@${selectedPreview.username}`
+                        : `@${selectedPreview.username}`
+                    }
+                  />
+                  <View style={styles.previewTopRow}>
+                    <View style={styles.previewAvatar}>
+                      <Text style={styles.previewAvatarText}>
+                        {initialsForName(
+                          selectedPreview.relationship_status === "friend" &&
+                            selectedPreview.display_name
+                            ? selectedPreview.display_name
+                            : selectedPreview.username,
+                        )}
+                      </Text>
+                    </View>
+                    <View style={styles.previewIntro}>
+                      <Text style={styles.previewUsername}>@{selectedPreview.username}</Text>
+                      {selectedPreview.friend_code ? (
+                        <Text style={styles.previewState}>
+                          Code: {selectedPreview.friend_code}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.previewState}>
+                        {selectedPreview.home_state_code
+                          ? `${selectedPreview.home_state_code}${
+                              selectedPreview.home_state_name
+                                ? ` · ${selectedPreview.home_state_name}`
+                                : ""
+                            }`
+                          : "No home state set"}
+                      </Text>
+                      {selectedPreview.title_name ? (
+                        <View style={styles.previewTitleChip}>
+                          <BadgeCheck color={theme.colors.amber} size={14} />
+                          <Text style={styles.previewTitleChipText}>
+                            {selectedPreview.title_name}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                ) : null}
-              </View>
-            </View>
 
-            <View style={styles.previewStats}>
-              <View style={styles.previewStatPill}>
-                <Text style={styles.previewStatValue}>{selectedPreview.xp_total}</Text>
-                <Text style={styles.previewStatLabel}>XP</Text>
-              </View>
-              <View style={styles.previewStatPill}>
-                <Text style={styles.previewStatValue}>{selectedPreview.quests_completed}</Text>
-                <Text style={styles.previewStatLabel}>Quests</Text>
-              </View>
-              <View style={styles.previewStatPill}>
-                <Text style={styles.previewStatValue}>{selectedPreview.reviews_count}</Text>
-                <Text style={styles.previewStatLabel}>Reviews</Text>
-              </View>
-              <View style={styles.previewStatPill}>
-                <Text style={styles.previewStatValue}>{selectedPreview.hidden_gems_completed}</Text>
-                <Text style={styles.previewStatLabel}>Gems</Text>
-              </View>
-            </View>
+                  <View style={styles.previewStats}>
+                    <View style={styles.previewStatPill}>
+                      <Text style={styles.previewStatValue}>{selectedPreview.xp_total}</Text>
+                      <Text style={styles.previewStatLabel}>XP</Text>
+                    </View>
+                    <View style={styles.previewStatPill}>
+                      <Text style={styles.previewStatValue}>
+                        {selectedPreview.quests_completed}
+                      </Text>
+                      <Text style={styles.previewStatLabel}>Quests</Text>
+                    </View>
+                    <View style={styles.previewStatPill}>
+                      <Text style={styles.previewStatValue}>
+                        {selectedPreview.reviews_count}
+                      </Text>
+                      <Text style={styles.previewStatLabel}>Reviews</Text>
+                    </View>
+                    <View style={styles.previewStatPill}>
+                      <Text style={styles.previewStatValue}>
+                        {selectedPreview.hidden_gems_completed}
+                      </Text>
+                      <Text style={styles.previewStatLabel}>Gems</Text>
+                    </View>
+                  </View>
 
-            <View style={styles.previewRelationshipRow}>
-              <View
-                style={[
-                  styles.relationshipChip,
-                  selectedPreview.relationship_status === "friend" && styles.relationshipChipFriend,
-                  selectedPreview.relationship_status === "incoming" &&
-                    styles.relationshipChipIncoming,
-                  selectedPreview.relationship_status === "outgoing" &&
-                    styles.relationshipChipOutgoing,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.relationshipChipText,
-                    selectedPreview.relationship_status === "friend" &&
-                      styles.relationshipChipTextDark,
-                  ]}
-                >
-                  {statusLabel(selectedPreview.relationship_status)}
-                </Text>
-              </View>
-              {selectedPreview.direction === "friend" ? (
-                <Text style={styles.previewMicrocopy}>
-                  Friend leaderboard entry and activity are now linked.
-                </Text>
-              ) : selectedPreview.direction === "incoming" ? (
-                <Text style={styles.previewMicrocopy}>
-                  They sent you a request. Accept it to connect the ladders.
-                </Text>
-              ) : selectedPreview.direction === "outgoing" ? (
-                <Text style={styles.previewMicrocopy}>
-                  Request sent. You can cancel it if you want to back out.
-                </Text>
-              ) : (
-                <Text style={styles.previewMicrocopy}>
-                  Public profile only. Add them to unlock friend-visible details.
-                </Text>
-              )}
-            </View>
+                  <View style={styles.previewRelationshipRow}>
+                    <View
+                      style={[
+                        styles.relationshipChip,
+                        selectedPreview.relationship_status === "friend" &&
+                          styles.relationshipChipFriend,
+                        selectedPreview.relationship_status === "incoming" &&
+                          styles.relationshipChipIncoming,
+                        selectedPreview.relationship_status === "outgoing" &&
+                          styles.relationshipChipOutgoing,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.relationshipChipText,
+                          selectedPreview.relationship_status === "friend" &&
+                            styles.relationshipChipTextDark,
+                        ]}
+                      >
+                        {statusLabel(selectedPreview.relationship_status)}
+                      </Text>
+                    </View>
+                    {selectedPreview.direction === "friend" ? (
+                      <Text style={styles.previewMicrocopy}>
+                        Friend leaderboard entry and activity are now linked.
+                      </Text>
+                    ) : selectedPreview.direction === "incoming" ? (
+                      <Text style={styles.previewMicrocopy}>
+                        They sent you a request. Accept it to connect the ladders.
+                      </Text>
+                    ) : selectedPreview.direction === "outgoing" ? (
+                      <Text style={styles.previewMicrocopy}>
+                        Request sent. You can cancel it if you want to back out.
+                      </Text>
+                    ) : (
+                      <Text style={styles.previewMicrocopy}>
+                        Public profile only. Add them to unlock friend-visible details.
+                      </Text>
+                    )}
+                  </View>
 
-            {selectedPreview.relationship_status === "incoming" ? (
-              <View style={styles.actionRow}>
-                <ActionButton
-                  label="Accept"
-                  onPress={() => {
-                    if (selectedPreview.friendship_id) {
-                      acceptMutation.mutate(selectedPreview.friendship_id);
-                    }
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <ActionButton
-                  label="Decline"
-                  onPress={() => {
-                    if (selectedPreview.friendship_id) {
-                      deleteMutation.mutate(selectedPreview.friendship_id);
-                    }
-                  }}
-                  secondary
-                  style={{ flex: 1 }}
-                />
-              </View>
-            ) : selectedPreview.relationship_status === "outgoing" ? (
-              <ActionButton
-                label="Cancel request"
-                onPress={() => {
-                  if (selectedPreview.friendship_id) {
-                    deleteMutation.mutate(selectedPreview.friendship_id);
-                  }
-                }}
-                secondary
-              />
-            ) : selectedPreview.relationship_status === "friend" ? (
-              <ActionButton
-                label="Remove friend"
-                onPress={() => {
-                  if (selectedPreview.friendship_id) {
-                    deleteMutation.mutate(selectedPreview.friendship_id);
-                  }
-                }}
-                secondary
-              />
-            ) : selectedPreview.relationship_status === "blocked" ? (
-              <EmptyStateCard
-                subtitle="This explorer is blocked for now. You can revisit later if the relationship changes."
-                title="Blocked"
-              />
-            ) : (
-              <ActionButton
-                label="Send friend request"
-                onPress={() => {
-                  requestMutation.mutate(selectedPreview.user_id);
-                }}
-              />
-            )}
+                  {selectedPreview.relationship_status === "incoming" ? (
+                    <View style={styles.actionRow}>
+                      <ActionButton
+                        label="Accept"
+                        onPress={() => {
+                          if (selectedPreview.friendship_id) {
+                            acceptMutation.mutate(selectedPreview.friendship_id);
+                          }
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                      <ActionButton
+                        label="Decline"
+                        onPress={() => {
+                          if (selectedPreview.friendship_id) {
+                            deleteMutation.mutate(selectedPreview.friendship_id);
+                          }
+                        }}
+                        secondary
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                  ) : selectedPreview.relationship_status === "outgoing" ? (
+                    <ActionButton
+                      label="Cancel request"
+                      onPress={() => {
+                        if (selectedPreview.friendship_id) {
+                          deleteMutation.mutate(selectedPreview.friendship_id);
+                        }
+                      }}
+                      secondary
+                    />
+                  ) : selectedPreview.relationship_status === "friend" ? (
+                    <ActionButton
+                      label="Remove friend"
+                      onPress={() => {
+                        if (selectedPreview.friendship_id) {
+                          deleteMutation.mutate(selectedPreview.friendship_id);
+                        }
+                      }}
+                      secondary
+                    />
+                  ) : selectedPreview.relationship_status === "blocked" ? (
+                    <EmptyStateCard
+                      subtitle="This explorer is blocked for now. You can revisit later if the relationship changes."
+                      title="Blocked"
+                    />
+                  ) : (
+                    <ActionButton
+                      label="Send friend request"
+                      onPress={() => {
+                        requestMutation.mutate(selectedPreview.user_id);
+                      }}
+                    />
+                  )}
+                </View>
+              ) : null}
+            </ScrollView>
           </View>
-        ) : null}
+        </Modal>
 
         <View>
           <SectionHeader
@@ -1175,6 +1196,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
+  },
+  previewModalBackdrop: {
+    backgroundColor: "rgba(8,15,29,0.5)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  previewModalScroll: {
+    paddingBottom: 24,
+    paddingTop: 24,
   },
   relationshipChip: {
     alignItems: "center",

@@ -45,6 +45,31 @@ export interface FeedLocationInput {
   stateCode: string;
 }
 
+function formatQuestError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  if (!message) {
+    return fallback;
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("accepted_id") ||
+    normalized.includes("ambiguous") ||
+    normalized.includes("next_redirect") ||
+    normalized.includes("row-level security") ||
+    normalized.includes("permission denied") ||
+    normalized.includes("syntax error") ||
+    normalized.includes("duplicate key") ||
+    normalized.includes("violates")
+  ) {
+    return fallback;
+  }
+
+  return message;
+}
+
 function buildStaticFeedItems(
   location: FeedLocationInput,
   quests = demoQuests,
@@ -146,30 +171,6 @@ function mapRpcQuestRow(row: any): QuestFeedItem {
     updated_at: row.updated_at ?? new Date().toISOString(),
     xp_reward: row.xp_reward,
   };
-}
-
-async function getHiddenSponsoredQuestIds(): Promise<string[]> {
-  const supabase = getSupabaseClient() as any;
-  const userId = await getCurrentSupabaseUserId();
-
-  if (!supabase || !userId) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from("user_hidden_sponsored_quests")
-    .select("quest_id")
-    .order("hidden_at", { ascending: false });
-
-  if (error) {
-    warnSupabaseFallback(
-      "Hidden sponsored quests",
-      error.message ?? "The live hidden-sponsored query failed in Supabase.",
-    );
-    return [];
-  }
-
-  return (data ?? []).map((row: { quest_id: string }) => row.quest_id);
 }
 
 async function getQuestCatalog(params: {
@@ -327,8 +328,6 @@ export async function getQuestFeed(params: {
     location: activeLocation,
     demoMode: params.demoMode,
   });
-  const hiddenSponsoredQuestIds = new Set(await getHiddenSponsoredQuestIds());
-
   const nearbyCandidates = source.items.filter((quest) => !quest.is_sponsored);
   const withinRadius = nearbyCandidates.filter(
     (quest) => quest.distanceMiles <= params.radiusMiles,
@@ -341,7 +340,7 @@ export async function getQuestFeed(params: {
     runtimeMessage: source.runtime.message,
     runtimeSource: source.runtime.source,
     sponsored: source.items
-      .filter((quest) => quest.is_sponsored && !hiddenSponsoredQuestIds.has(quest.id))
+      .filter((quest) => quest.is_sponsored)
       .slice(0, 4),
     usingFallbackLocation: params.demoMode || !params.location,
   };
@@ -424,8 +423,10 @@ export async function acceptQuest(params: {
     );
 
     throw new Error(
-      error?.message ??
+      formatQuestError(
+        error,
         "Quest acceptance failed against the live Supabase project.",
+      ),
     );
   }
 
@@ -482,7 +483,12 @@ export async function checkInQuest(params: {
     });
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        formatQuestError(
+          error,
+          "We could not verify this check-in right now. Please try again.",
+        ),
+      );
     }
 
     const row = (data as any[])[0];
@@ -542,7 +548,12 @@ export async function completeQuest(params: {
     });
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        formatQuestError(
+          error,
+          "We could not complete this quest right now. Please try again.",
+        ),
+      );
     }
 
     const row = (data as any[])[0];
@@ -582,13 +593,59 @@ export async function hideSponsoredQuest(params: {
     });
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(
+        formatQuestError(
+          error,
+          "We could not update the sponsored spotlight right now.",
+        ),
+      );
     }
 
     return data as Array<{ hidden_at: string; quest_id: string }>;
   }
 
   return [];
+}
+
+export async function cancelAcceptedQuest(params: {
+  demoMode?: boolean;
+  questId: string;
+}) {
+  const now = new Date().toISOString();
+
+  if (params.demoMode) {
+    return {
+      canceledAt: now,
+    };
+  }
+
+  const supabase = getSupabaseClient() as any;
+  const userId = await getCurrentSupabaseUserId();
+
+  if (supabase && userId) {
+    const { data, error } = await supabase
+      .from("quest_acceptances")
+      .delete()
+      .eq("user_id", userId)
+      .eq("quest_id", params.questId)
+      .select("accepted_at")
+      .maybeSingle();
+
+    if (!error) {
+      return {
+        canceledAt: data?.accepted_at ?? now,
+      };
+    }
+
+    throw new Error(
+      formatQuestError(
+        error,
+        "We could not cancel this quest right now. Please try again.",
+      ),
+    );
+  }
+
+  throw new Error("Sign in to cancel quests in the live Supabase project.");
 }
 
 export async function resetHiddenSponsoredQuests(params?: {

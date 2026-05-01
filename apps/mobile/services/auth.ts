@@ -16,6 +16,10 @@ function buildOAuthRedirectUrl() {
   return Linking.createURL("auth/callback");
 }
 
+function buildRecoveryRedirectUrl() {
+  return Linking.createURL("auth/callback?mode=recovery");
+}
+
 function readOAuthCallbackParams(callbackUrl: string) {
   const parsed = new URL(callbackUrl);
   const searchParams = parsed.searchParams;
@@ -114,6 +118,38 @@ export async function signUpWithEmail(input: SignUpInput) {
   }
 
   return data;
+}
+
+export async function requestPasswordReset(email: string) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error("Supabase is not configured for this app.");
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: buildRecoveryRedirectUrl(),
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateMobilePassword(password: string) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error("Supabase is not configured for this app.");
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function signInWithOAuthProvider(provider: OAuthProvider) {

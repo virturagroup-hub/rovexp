@@ -60,6 +60,7 @@ interface AppState {
     questId: string;
     xpAwarded: number;
   }) => void;
+  cancelQuest: (questId: string) => void;
   hydrateAccount: (payload: HydratedAccountPayload) => void;
   recordReview: (payload: { questId: string; reviewId: string }) => void;
   resetQuestFilters: () => void;
@@ -203,6 +204,15 @@ export const useAppStore = create<AppState>()(
           },
           xpTotal: state.xpTotal + xpAwarded,
         })),
+      cancelQuest: (questId) =>
+        set((state) => {
+          const nextProgress = { ...state.questProgress };
+          delete nextProgress[questId];
+
+          return {
+            questProgress: nextProgress,
+          };
+        }),
       hydrateAccount: ({ email, mode, profileSummary, questProgress }) =>
         set({
           ...applyProfileSummaryState(profileSummary),

@@ -13,6 +13,12 @@ import {
 
 import { warnSupabaseFallback } from "@/lib/runtime-status";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getCurrentSupabaseUserId } from "@/services/auth";
+
+export interface AdminAccessSummary {
+  role: "owner" | "editor";
+  user_id: string;
+}
 
 function sumTotals(rows: Array<Pick<UserStateStat, "xp_total" | "quests_completed" | "hidden_gems_completed" | "reviews_count">>, userId: string): UserProgressTotals {
   return rows.reduce<UserProgressTotals>(
@@ -226,4 +232,36 @@ export async function saveUserSettings(params: {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function getAdminAccessSummary(): Promise<AdminAccessSummary | null> {
+  const supabase = getSupabaseClient() as any;
+  const userId = await getCurrentSupabaseUserId();
+
+  if (!supabase || !userId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    warnSupabaseFallback(
+      "Admin access",
+      error.message ?? "The live admin membership lookup failed in Supabase.",
+    );
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    role: data.role,
+    user_id: userId,
+  };
 }

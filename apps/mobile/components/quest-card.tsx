@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import type { QuestProgress } from "@rovexp/types";
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import Animated, {
   FadeInDown,
@@ -25,11 +25,13 @@ interface QuestCardProps {
   onAccept: (quest: QuestFeedItem) => Promise<void>;
   onCheckIn: (quest: QuestFeedItem) => Promise<{ mockVerified: boolean } | void>;
   onComplete: (quest: QuestFeedItem) => Promise<void>;
-  onHideQuest?: (quest: QuestFeedItem) => Promise<void> | void;
+  onCancelQuest?: (quest: QuestFeedItem) => Promise<void> | void;
   progress?: QuestProgress;
   compact?: boolean;
   quest: QuestFeedItem;
   style?: StyleProp<ViewStyle>;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 function getQuestStatus(progress?: QuestProgress) {
@@ -43,19 +45,31 @@ export function QuestCard({
   isBusy,
   locationPermission,
   onAccept,
+  onCancelQuest,
   onCheckIn,
   onComplete,
-  onHideQuest,
+  expanded: expandedProp,
+  onExpandedChange,
   progress,
   quest,
   style,
 }: QuestCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const isExpanded = expandedProp ?? expanded;
   const status = getQuestStatus(progress);
   const palette = rarityColors[quest.rarity];
   const sponsored = quest.is_sponsored;
   const distanceLabel = formatDistanceMiles(quest.distanceMiles);
-  const showHeroImage = Boolean(quest.image_url) && (!compact || expanded);
+  const showHeroImage = Boolean(quest.image_url) && (!compact || !isExpanded);
+
+  const setCardExpanded = (nextValue: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(nextValue);
+      return;
+    }
+
+    setExpanded(nextValue);
+  };
 
   const handlePrimaryAction = async () => {
     if (status === "available") {
@@ -81,12 +95,25 @@ export function QuestCard({
     }
   };
 
-  const handleHideQuest = async () => {
-    if (!onHideQuest) {
+  const handleCancelQuest = () => {
+    if (!onCancelQuest) {
       return;
     }
 
-    await onHideQuest(quest);
+    Alert.alert(
+      "Cancel quest?",
+      "This removes the acceptance and clears any linked check-in or completion progress.",
+      [
+        { style: "cancel", text: "Keep quest" },
+        {
+          style: "destructive",
+          text: "Cancel quest",
+          onPress: () => {
+            void onCancelQuest(quest);
+          },
+        },
+      ],
+    );
   };
 
   const primaryLabel =
@@ -134,7 +161,7 @@ export function QuestCard({
         >
           <Pressable
             accessibilityRole="button"
-            onPress={() => setExpanded((current) => !current)}
+            onPress={() => setCardExpanded(!isExpanded)}
           >
             {showHeroImage ? (
               <View style={styles.cardImageWrap}>
@@ -160,7 +187,12 @@ export function QuestCard({
                       </Text>
                     </View>
                   )}
-                  <Text style={styles.sponsorIdentityText}>
+                  <Text
+                    style={[
+                      styles.sponsorIdentityText,
+                      sponsored && styles.sponsorIdentityTextSponsored,
+                    ]}
+                  >
                     Presented by {quest.sponsor_business.name}
                   </Text>
                 </View>
@@ -191,33 +223,62 @@ export function QuestCard({
             </View>
 
             <View style={styles.metaRow}>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaLabel}>Distance</Text>
-                <Text style={styles.metaValue}>{distanceLabel}</Text>
+              <View style={[styles.metaChip, sponsored && styles.metaChipSponsored]}>
+                <Text
+                  style={[styles.metaLabel, sponsored && styles.metaLabelSponsored]}
+                >
+                  Distance
+                </Text>
+                <Text
+                  style={[styles.metaValue, sponsored && styles.metaValueSponsored]}
+                >
+                  {distanceLabel}
+                </Text>
               </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaLabel}>Reward</Text>
-                <Text style={styles.metaValue}>{quest.xp_reward} XP</Text>
+              <View style={[styles.metaChip, sponsored && styles.metaChipSponsored]}>
+                <Text
+                  style={[styles.metaLabel, sponsored && styles.metaLabelSponsored]}
+                >
+                  Reward
+                </Text>
+                <Text
+                  style={[styles.metaValue, sponsored && styles.metaValueSponsored]}
+                >
+                  {quest.xp_reward} XP
+                </Text>
               </View>
               {!compact ? (
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaLabel}>Radius</Text>
-                  <Text style={styles.metaValue}>{quest.radius_meters}m</Text>
+                <View style={[styles.metaChip, sponsored && styles.metaChipSponsored]}>
+                  <Text
+                    style={[styles.metaLabel, sponsored && styles.metaLabelSponsored]}
+                  >
+                    Radius
+                  </Text>
+                  <Text
+                    style={[styles.metaValue, sponsored && styles.metaValueSponsored]}
+                  >
+                    {quest.radius_meters}m
+                  </Text>
                 </View>
               ) : null}
             </View>
 
-            <Text style={styles.expandHint}>
-              {expanded ? "Tap to collapse" : "Tap to preview"}
+            <Text
+              style={[styles.expandHint, sponsored && styles.expandHintSponsored]}
+            >
+              {isExpanded ? "Tap to collapse" : "Tap to preview"}
             </Text>
           </Pressable>
 
-          {expanded ? (
+          {isExpanded ? (
             <Animated.View entering={FadeInDown.duration(220)} exiting={FadeOut}>
               <View style={styles.detailsCard}>
                 {compact && quest.image_url ? (
                   <View style={styles.expandedMediaWrap}>
-                    <Image source={{ uri: quest.image_url }} style={styles.expandedMedia} />
+                    <Image
+                      source={{ uri: quest.image_url as string }}
+                      style={styles.expandedMedia}
+                    />
                   </View>
                 ) : null}
                 <Text style={styles.description}>{quest.description}</Text>
@@ -238,11 +299,11 @@ export function QuestCard({
                     label={primaryLabel}
                     onPress={handlePrimaryAction}
                   />
-                  {sponsored && onHideQuest ? (
+                  {status === "accepted" && onCancelQuest ? (
                     <ActionButton
                       disabled={isBusy}
-                      label="Hide quest"
-                      onPress={() => void handleHideQuest()}
+                      label="Cancel quest"
+                      onPress={() => void handleCancelQuest()}
                       secondary
                     />
                   ) : null}
@@ -357,6 +418,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textTransform: "uppercase",
   },
+  expandHintSponsored: {
+    color: "rgba(255,255,255,0.8)",
+  },
   helperText: {
     color: theme.colors.muted,
     fontSize: 13,
@@ -378,12 +442,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  metaChipSponsored: {
+    backgroundColor: "rgba(8,15,29,0.22)",
+    borderColor: "rgba(255,255,255,0.22)",
+  },
   metaLabel: {
     color: theme.colors.muted,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  metaLabelSponsored: {
+    color: "rgba(255,255,255,0.74)",
   },
   metaRow: {
     flexDirection: "row",
@@ -395,6 +466,9 @@ const styles = StyleSheet.create({
     fontFamily: "SpaceMono",
     fontSize: 14,
     marginTop: 4,
+  },
+  metaValueSponsored: {
+    color: theme.colors.textOnDark,
   },
   questTitle: {
     color: theme.colors.ink,
@@ -408,15 +482,15 @@ const styles = StyleSheet.create({
   },
   sponsorPill: {
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.sponsorSoft,
+    backgroundColor: "rgba(255,255,255,0.14)",
     borderRadius: 999,
-    borderColor: "rgba(242,138,26,0.18)",
+    borderColor: "rgba(255,255,255,0.22)",
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   sponsorPillText: {
-    color: theme.colors.sponsorText,
+    color: theme.colors.textOnDark,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.2,
@@ -432,6 +506,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: "700",
+  },
+  sponsorIdentityTextSponsored: {
+    color: theme.colors.textOnDark,
   },
   sponsorLogo: {
     borderRadius: 999,

@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import type { QuestDiscoveryType, QuestRarity } from "@rovexp/types";
 
@@ -7,6 +15,7 @@ import { QuestCard } from "@/components/quest-card";
 import { SettingsButton } from "@/components/settings-button";
 import { RuntimeStatusBanner } from "@/components/runtime-status-banner";
 import { EmptyStateCard, ScreenHeader, SectionHeader, ScreenView } from "@/components/ui";
+import { ActionButton } from "@/components/ui";
 import { theme } from "@/constants/theme";
 import { tabBarLayout } from "@/constants/navigation";
 import { useQuestFeedQuery, useQuestFlowMutations } from "@/hooks/use-rovexp-data";
@@ -42,10 +51,11 @@ export default function QuestsScreen() {
   const locationPermission = useAppStore((state) => state.locationPermission);
   const lastKnownLocation = useAppStore((state) => state.lastKnownLocation);
   const { data } = useQuestFeedQuery();
-  const { acceptMutation, checkInMutation, completeMutation } =
+  const { acceptMutation, cancelMutation, checkInMutation, completeMutation } =
     useQuestFlowMutations();
   const [sortMode, setSortMode] =
     useState<(typeof sortOptions)[number]["value"]>("distance");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const activeLocation = demoMode
     ? {
         areaLabel: mobileEnv.defaultAreaLabel,
@@ -78,6 +88,11 @@ export default function QuestsScreen() {
     const status = questProgress[quest.id]?.status;
     return status && status !== "reviewed";
   });
+  const busy =
+    acceptMutation.isPending ||
+    cancelMutation.isPending ||
+    checkInMutation.isPending ||
+    completeMutation.isPending;
 
   const handleAccept = async (quest: QuestFeedItem) => {
     try {
@@ -85,6 +100,18 @@ export default function QuestsScreen() {
     } catch (error) {
       Alert.alert(
         "Could not accept quest",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    }
+  };
+
+  const handleCancelQuest = async (quest: QuestFeedItem) => {
+    try {
+      await cancelMutation.mutateAsync(quest);
+      Alert.alert("Quest canceled", "The quest has been removed from your active chain.");
+    } catch (error) {
+      Alert.alert(
+        "Cancel failed",
         error instanceof Error ? error.message : "Please try again.",
       );
     }
@@ -169,148 +196,57 @@ export default function QuestsScreen() {
           ))}
         </View>
 
-        <View style={styles.filterCard}>
+        <View style={styles.filterSummaryCard}>
           <SectionHeader
             eyebrow="Filters"
-            subtitle="Saved preferences apply across Home, Quests, and Map."
+            subtitle="The Quests board is the primary place to tune discovery. Saved defaults still carry into Home and Map."
             title="Browse controls"
           />
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Sort</Text>
-            <View style={styles.chipRow}>
-              {sortOptions.map((option) => (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setSortMode(option.value)}
-                  style={[
-                    styles.chip,
-                    sortMode === option.value && styles.chipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      sortMode === option.value && styles.chipTextActive,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+          <View style={styles.filterSummaryLine}>
+            <Text style={styles.filterSummaryLabel}>Sort</Text>
+            <Text style={styles.filterSummaryValue}>
+              {sortOptions.find((option) => option.value === sortMode)?.label}
+            </Text>
           </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Sponsor mode</Text>
-            <View style={styles.chipRow}>
-              {["all", "sponsored", "regular"].map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() =>
-                    setQuestFilters((current) => ({
-                      ...current,
-                      sponsor_filter: value as typeof current.sponsor_filter,
-                    }))
-                  }
-                  style={[
-                    styles.chip,
-                    questFilters.sponsor_filter === value && styles.chipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      questFilters.sponsor_filter === value && styles.chipTextActive,
-                    ]}
-                  >
-                    {value}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+          <View style={styles.filterSummaryLine}>
+            <Text style={styles.filterSummaryLabel}>Sponsor mode</Text>
+            <Text style={styles.filterSummaryValue}>
+              {questFilters.sponsor_filter === "all"
+                ? "All quests"
+                : questFilters.sponsor_filter === "sponsored"
+                  ? "Sponsored only"
+                  : "Regular only"}
+            </Text>
           </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Discovery</Text>
-            <View style={styles.chipRow}>
-              {discoveryOptions.map((option) => {
-                const active = questFilters.discovery_types.includes(option.value);
-
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        discovery_types: toggleValue(current.discovery_types, option.value),
-                      }))
-                    }
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          <View style={styles.filterSummaryLine}>
+            <Text style={styles.filterSummaryLabel}>Discovery</Text>
+            <Text style={styles.filterSummaryValue}>
+              {questFilters.discovery_types.length
+                ? `${questFilters.discovery_types.length} selected`
+                : "All discovery types"}
+            </Text>
           </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Rarity</Text>
-            <View style={styles.chipRow}>
-              {rarityOptions.map((value) => {
-                const active = questFilters.rarities.includes(value);
-
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        rarities: toggleValue(current.rarities, value),
-                      }))
-                    }
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {value}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          <View style={styles.filterSummaryLine}>
+            <Text style={styles.filterSummaryLabel}>Rarity</Text>
+            <Text style={styles.filterSummaryValue}>
+              {questFilters.rarities.length
+                ? `${questFilters.rarities.length} selected`
+                : "All rarities"}
+            </Text>
           </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterGroupLabel}>Categories</Text>
-            <View style={styles.chipRow}>
-              {categoryOptions.map((category) => {
-                const active = questFilters.category_slugs.includes(category.slug);
-
-                return (
-                  <Pressable
-                    key={category.id}
-                    onPress={() =>
-                      setQuestFilters((current) => ({
-                        ...current,
-                        category_slugs: toggleValue(
-                          current.category_slugs,
-                          category.slug,
-                        ),
-                      }))
-                    }
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {category.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          <View style={styles.filterSummaryLine}>
+            <Text style={styles.filterSummaryLabel}>Categories</Text>
+            <Text style={styles.filterSummaryValue}>
+              {questFilters.category_slugs.length
+                ? `${questFilters.category_slugs.length} selected`
+                : "All categories"}
+            </Text>
           </View>
+          <ActionButton
+            label="Open quest filters"
+            onPress={() => setFiltersOpen(true)}
+            secondary
+          />
         </View>
 
         <View>
@@ -324,13 +260,10 @@ export default function QuestsScreen() {
               <QuestCard
                 key={quest.id}
                 currentLocation={activeLocation}
-                isBusy={
-                  acceptMutation.isPending ||
-                  checkInMutation.isPending ||
-                  completeMutation.isPending
-                }
+                isBusy={busy}
                 locationPermission={locationPermission}
                 onAccept={handleAccept}
+                onCancelQuest={handleCancelQuest}
                 onCheckIn={handleCheckIn}
                 onComplete={handleComplete}
                 progress={questProgress[quest.id]}
@@ -356,13 +289,10 @@ export default function QuestsScreen() {
               <QuestCard
                 key={quest.id}
                 currentLocation={activeLocation}
-                isBusy={
-                  acceptMutation.isPending ||
-                  checkInMutation.isPending ||
-                  completeMutation.isPending
-                }
+                isBusy={busy}
                 locationPermission={locationPermission}
                 onAccept={handleAccept}
+                onCancelQuest={handleCancelQuest}
                 onCheckIn={handleCheckIn}
                 onComplete={handleComplete}
                 progress={questProgress[quest.id]}
@@ -376,6 +306,176 @@ export default function QuestsScreen() {
             />
           )}
         </View>
+
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setFiltersOpen(false)}
+          transparent
+          visible={filtersOpen}
+        >
+          <View style={styles.filterModalBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFiltersOpen(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.filterModalSheet}>
+              <View style={styles.filterModalHandle} />
+              <SectionHeader
+                actionLabel="Done"
+                eyebrow="Filters"
+                onActionPress={() => setFiltersOpen(false)}
+                subtitle="Tune how the board sorts and narrows quests. These defaults carry through the rest of the app."
+                title="Quest filters"
+              />
+
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupLabel}>Sort</Text>
+                <View style={styles.chipRow}>
+                  {sortOptions.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setSortMode(option.value)}
+                      style={[
+                        styles.chip,
+                        sortMode === option.value && styles.chipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          sortMode === option.value && styles.chipTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupLabel}>Sponsor mode</Text>
+                <View style={styles.chipRow}>
+                  {["all", "sponsored", "regular"].map((value) => (
+                    <Pressable
+                      key={value}
+                      onPress={() =>
+                        setQuestFilters((current) => ({
+                          ...current,
+                          sponsor_filter: value as typeof current.sponsor_filter,
+                        }))
+                      }
+                      style={[
+                        styles.chip,
+                        questFilters.sponsor_filter === value && styles.chipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          questFilters.sponsor_filter === value && styles.chipTextActive,
+                        ]}
+                      >
+                        {value}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupLabel}>Discovery</Text>
+                <View style={styles.chipRow}>
+                  {discoveryOptions.map((option) => {
+                    const active = questFilters.discovery_types.includes(option.value);
+
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() =>
+                          setQuestFilters((current) => ({
+                            ...current,
+                            discovery_types: toggleValue(
+                              current.discovery_types,
+                              option.value,
+                            ),
+                          }))
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text
+                          style={[styles.chipText, active && styles.chipTextActive]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupLabel}>Rarity</Text>
+                <View style={styles.chipRow}>
+                  {rarityOptions.map((value) => {
+                    const active = questFilters.rarities.includes(value);
+
+                    return (
+                      <Pressable
+                        key={value}
+                        onPress={() =>
+                          setQuestFilters((current) => ({
+                            ...current,
+                            rarities: toggleValue(current.rarities, value),
+                          }))
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text
+                          style={[styles.chipText, active && styles.chipTextActive]}
+                        >
+                          {value}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupLabel}>Categories</Text>
+                <View style={styles.chipRow}>
+                  {categoryOptions.map((category) => {
+                    const active = questFilters.category_slugs.includes(category.slug);
+
+                    return (
+                      <Pressable
+                        key={category.id}
+                        onPress={() =>
+                          setQuestFilters((current) => ({
+                            ...current,
+                            category_slugs: toggleValue(
+                              current.category_slugs,
+                              category.slug,
+                            ),
+                          }))
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text
+                          style={[styles.chipText, active && styles.chipTextActive]}
+                        >
+                          {category.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </ScreenView>
   );
@@ -419,6 +519,55 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 16,
     padding: 18,
+  },
+  filterModalBackdrop: {
+    backgroundColor: "rgba(11,24,48,0.44)",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  filterModalHandle: {
+    alignSelf: "center",
+    backgroundColor: theme.colors.border,
+    borderRadius: 999,
+    height: 4,
+    marginBottom: 14,
+    width: 54,
+  },
+  filterModalSheet: {
+    backgroundColor: theme.colors.canvas,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 16,
+    maxHeight: "90%",
+    padding: 18,
+  },
+  filterSummaryCard: {
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.large,
+    borderWidth: 1,
+    gap: 12,
+    padding: 18,
+  },
+  filterSummaryLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  filterSummaryLabel: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  filterSummaryValue: {
+    color: theme.colors.ink,
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "right",
   },
   filterGroup: {
     gap: 10,
