@@ -12,7 +12,8 @@ This is the short handoff for the deadline-friendly demo path.
 ## Admin demo
 
 - Open the admin portal.
-- If `ADMIN_DEMO_ENABLED=true`, the login page shows `Open demo walkthrough`.
+- The admin demo walkthrough is enabled by default unless `ADMIN_DEMO_ENABLED=false` is set.
+- The login page shows `Open demo walkthrough`.
 - You can also open `/demo` directly to skip login and enter the seeded demo session immediately.
 - Those demo paths use the seeded mock admin store and keep live content untouched.
 - If you want the real admin flow, sign in with a Supabase admin user and open `/showcase`.
