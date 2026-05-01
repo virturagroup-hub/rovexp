@@ -55,7 +55,7 @@ corepack pnpm --filter @rovexp/admin dev
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (legacy fallback only)
-- `ADMIN_DEMO_ENABLED` (showcase/demo walkthrough toggle)
+- `ADMIN_DEMO_ENABLED` (optional demo walkthrough toggle; demo is enabled by default unless explicitly set to `false`)
 
 ## Auth
 
@@ -75,18 +75,20 @@ on conflict (user_id) do update set role = excluded.role;
 
 ## Demo Walkthrough Mode
 
-If `ADMIN_DEMO_ENABLED=true`, the `/login` page shows a clearly labeled demo walkthrough entry path.
+The demo walkthrough is enabled by default. Set `ADMIN_DEMO_ENABLED=false` only if you want to hide the public demo entry points.
+
+The `/login` page shows a clearly labeled demo walkthrough entry path.
 That path uses the seeded mock admin store and is meant for showcase exploration only.
 The dashboard also exposes a persistent `/showcase` route that opens the same guided demo
 inside the admin deployment after sign-in.
 
 There is also a no-login demo route at `/demo`. It sets the same seeded demo session and
 redirects straight into the dashboard, which is useful when you want to show the admin site
-without first completing Supabase auth.
+without first completing Supabase auth. The route is available by default unless explicitly disabled.
 
 - live auth still works normally
 - demo mode is only entered when the user explicitly chooses it
-- demo mode can be disabled in production by leaving `ADMIN_DEMO_ENABLED` unset or `false`
+- demo mode can be disabled in production by setting `ADMIN_DEMO_ENABLED=false`
 
 The demo walkthrough highlights the major admin surfaces:
 

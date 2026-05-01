@@ -130,10 +130,21 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   <SubmitButton>Sign in</SubmitButton>
                 </form>
               ) : (
-                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
-                  The admin dashboard now requires real Supabase auth. Add the
-                  environment variables, create an auth user, then promote that
-                  user in <code className="mx-1 rounded bg-white/80 px-1.5 py-0.5 text-xs">public.admin_users</code>.
+                <div className="space-y-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
+                  <p>
+                    Supabase auth is not configured in this deployment yet.
+                    You can still open the demo walkthrough below without
+                    signing in, or add the environment variables for private
+                    admin access.
+                  </p>
+                  <p>
+                    For real sign-in, create an auth user and promote that user
+                    in
+                    <code className="mx-1 rounded bg-white/80 px-1.5 py-0.5 text-xs">
+                      public.admin_users
+                    </code>
+                    .
+                  </p>
                 </div>
               )}
 

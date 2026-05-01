@@ -1,9 +1,34 @@
 import { cookies } from "next/headers";
 
 export const adminDemoCookieName = "rovexp_admin_demo";
-export const isAdminDemoEnabled =
-  process.env.ADMIN_DEMO_ENABLED === "true" ||
-  process.env.NEXT_PUBLIC_ADMIN_DEMO_ENABLED === "true";
+
+function readBooleanEnv(value: string | undefined) {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
+const explicitDemoSetting =
+  readBooleanEnv(process.env.ADMIN_DEMO_ENABLED) ??
+  readBooleanEnv(process.env.NEXT_PUBLIC_ADMIN_DEMO_ENABLED);
+
+export const isAdminDemoEnabled = explicitDemoSetting ?? true;
 
 export async function isAdminDemoActive() {
   if (!isAdminDemoEnabled) {
