@@ -1221,6 +1221,9 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                   <li>• Richer maps, directions, and trip planning on the user side</li>
                   <li>• Sponsor CRM tools, analytics, and renewal planning</li>
                   <li>• Deeper achievement rewards, partnerships, and monetization layers</li>
+                  <li>• Profile pictures, avatar strategy, and richer identity cues</li>
+                  <li>• Google profile, review, and image enrichment for places</li>
+                  <li>• More advanced reward types and account lifecycle controls</li>
                 </ul>
               </div>
             </div>
@@ -1238,6 +1241,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 "Friend challenges and group quests",
                 "Seasonal and city-specific routes",
                 "Push notifications and photo-first moments",
+                "Profile pictures and richer avatar identity",
               ]}
             />
             <RoadmapCard
@@ -1251,6 +1255,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 "Reward partnerships and premium tiers",
                 "Renewals, contacts, and planning",
                 "Discounts, gift cards, and branded offers",
+                "More advanced sponsor CRM and campaign ops",
               ]}
             />
             <RoadmapCard
@@ -1264,6 +1269,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 "Candidate quality scoring",
                 "Advanced moderation dashboards",
                 "City rollout and coverage planning",
+                "Google profile / review / image enrichment",
               ]}
             />
             <RoadmapCard
@@ -1277,6 +1283,7 @@ export function ShowcaseDemo({ mode }: ShowcaseDemoProps) {
                 "Reward catalog expansion",
                 "Conversion and foot-traffic insights",
                 "Premium sponsor experiences",
+                "Account deactivation lifecycle controls",
               ]}
             />
           </div>

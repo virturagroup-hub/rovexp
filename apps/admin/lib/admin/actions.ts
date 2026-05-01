@@ -116,24 +116,52 @@ function isStateReferenceError(error: unknown) {
   return error instanceof Error && error.message.startsWith("State ");
 }
 
-function generationErrorCode(error: unknown) {
+function isRedirectSignal(error: unknown) {
   if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const digest = (error as Error & { digest?: string }).digest ?? "";
+
+  return error.message.includes("NEXT_REDIRECT") || digest.includes("NEXT_REDIRECT");
+}
+
+function readErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return "";
+}
+
+function generationErrorCode(error: unknown) {
+  const message = readErrorMessage(error);
+
+  if (!message) {
     return "place-generation-failed";
   }
 
-  if (error.message.includes("already has a live quest")) {
+  if (message.includes("already has a live quest")) {
     return "place-already-published";
   }
 
-  if (error.message.includes("valid coordinates")) {
+  if (message.includes("valid coordinates")) {
     return "place-needs-coordinates";
   }
 
-  if (error.message.includes("active public places")) {
+  if (message.includes("active public places")) {
     return "place-not-eligible";
   }
 
-  if (error.message.includes("duplicate key value") || error.message.includes("unique constraint")) {
+  if (message.includes("duplicate key value") || message.includes("unique constraint")) {
     return "candidate-duplicate";
   }
 
@@ -141,7 +169,9 @@ function generationErrorCode(error: unknown) {
 }
 
 function generationErrorDetail(error: unknown) {
-  return error instanceof Error ? error.message : "Something unexpected blocked candidate generation.";
+  const message = readErrorMessage(error);
+
+  return message || "Something unexpected blocked candidate generation.";
 }
 
 function parseImportPayload(value?: string) {
@@ -402,6 +432,10 @@ export async function savePlaceAction(formData: FormData) {
       website: toNullable(parsed.data.website),
     });
   } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     if (isStateReferenceError(error)) {
       redirect("/dashboard/places?error=state-invalid");
     }
@@ -546,6 +580,10 @@ export async function generateQuestCandidateAction(formData: FormData) {
   try {
     candidate = await generateQuestCandidateFromPlace(placeId);
   } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     const code = generationErrorCode(error);
     const detail = encodeURIComponent(generationErrorDetail(error));
     redirect(`/dashboard/places?error=${code}&detail=${detail}`);
@@ -594,6 +632,10 @@ export async function savePlaceFromMapAction(formData: FormData) {
       website: toNullable(parsed.data.website),
     });
   } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     if (isStateReferenceError(error)) {
       redirect("/dashboard/places?error=state-invalid");
     }
@@ -645,6 +687,10 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
       website: toNullable(parsed.data.website),
     });
   } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     if (isStateReferenceError(error)) {
       redirect("/dashboard/places?error=state-invalid");
     }
@@ -663,6 +709,10 @@ export async function savePlaceAndGenerateCandidateAction(formData: FormData) {
   try {
     candidate = await generateQuestCandidateFromPlace(savedPlace.id);
   } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     const code = generationErrorCode(error);
     const detail = encodeURIComponent(generationErrorDetail(error));
     redirect(`/dashboard/places?error=${code}&detail=${detail}`);
@@ -748,7 +798,11 @@ export async function generateNearbyQuestCandidatesAction(formData: FormData) {
         intent === "generate_selected" ? parsed.data.selected_place_ids : [],
       state_id: parsed.data.state_id,
     });
-  } catch {
+  } catch (error) {
+    if (isRedirectSignal(error)) {
+      throw error;
+    }
+
     redirect("/dashboard/places/nearby?error=check-form");
   }
 
